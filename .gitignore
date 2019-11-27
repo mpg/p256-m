@@ -1,1 +1,5 @@
 test
+*.o
+*.s
+*.dump
+*.sizes

@@ -7,7 +7,10 @@ runtest: $(TESTBIN)
 $(TESTBIN): $(SRC)
 	clang -Weverything -O1 $< -o $@
 
-clean:
-	rm -f $(TESTBIN)
+all: runtest
+	./sizes.sh
 
-.PHONY: runtest clean
+clean:
+	rm -f $(TESTBIN) *.s *.o *.dump *.sizes
+
+.PHONY: runtest clean all

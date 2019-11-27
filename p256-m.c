@@ -4,7 +4,13 @@
 #include <stdio.h>
 #endif
 
-static uint32_t u256_add(uint32_t z[8],
+#if defined(NO_MAIN)
+#define STATIC
+#else
+#define STATIC static
+#endif
+
+STATIC uint32_t u256_add(uint32_t z[8],
                          const uint32_t x[8], const uint32_t y[8])
 {
     uint32_t carry = 0;
