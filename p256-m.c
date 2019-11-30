@@ -27,6 +27,7 @@
  * in: x, y in [0, 2^256)
  * out: z = (x + y) mod 2^256
  *      c = (x + y) div 2^256
+ * That is, z + c * 2^256 = x + y
  */
 STATIC uint32_t u256_add(uint32_t z[8],
                          const uint32_t x[8], const uint32_t y[8])
@@ -48,6 +49,7 @@ STATIC uint32_t u256_add(uint32_t z[8],
  * in: x, y in [0, 2^256)
  * out: z = (x - y) mod 2^256
  *      c = 0 if x >=y, 1 otherwise
+ * That is, z = c * 2^256 + x - y
  */
 STATIC uint32_t u256_sub(uint32_t z[8],
                          const uint32_t x[8], const uint32_t y[8])
@@ -105,6 +107,26 @@ STATIC void m256_add(uint32_t z[8],
     u256_cmov(z, r, use_sub);
 }
 
+/*
+ * Modular subtraction
+ *
+ * in: x, y in [0, m)
+ *     m in [0, 2^256)
+ * out: z = (x - y) mod m, in [0, m)
+ */
+STATIC void m256_sub(uint32_t z[8],
+                     const uint32_t x[8], const uint32_t y[8],
+                     const uint32_t m[8])
+{
+    uint32_t r[8];
+    uint32_t carry = u256_sub(z, x, y);
+    (void) u256_add(r, z, m);
+    /* Need to add m if and only if x < y, that is carry == 1.
+     * In that case z is in [2^256 - p + 1, 2^256 - 1], so the
+     * addition will have a carry as well, which cancels out. */
+    u256_cmov(z, r, carry);
+}
+
 /**********************************************************************
  *
  * Functions and data for testing and debugging
@@ -144,6 +166,14 @@ static void test_madd(const char *name, const uint32_t m[8],
     print_u256(name, z, 0);
 }
 
+static void test_msub(const char *name, const uint32_t m[8],
+                      const uint32_t x[8], const uint32_t y[8])
+{
+    uint32_t z[8];
+    m256_sub(z, x, y, m);
+    print_u256(name, z, 0);
+}
+
 static const uint32_t r[8] = {
     0xdcd1d063, 0x7d3d0eb8, 0x9c4ecc3c, 0xd937cbcb,
     0x0a14613e, 0xf76db5ed, 0xec0db49c, 0x760cd745,
@@ -164,6 +194,12 @@ static const uint32_t smr[8] = {
     0x7473c55f, 0x48a6f4f9, 0xb7f6305c, 0xda79fb21,
     0xa2b76ec0, 0xe6789c5c, 0x2601023a, 0xa12b3489,
 };
+
+static const uint32_t zero[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+static const uint32_t one[8] = {1, 0, 0, 0, 0, 0, 0, 0};
+static const uint32_t mone[8] = {-1u, -1u, -1u, -1u, -1u, -1u, -1u, -1u};
+static const uint32_t word[8] = {-1u, 0, 0, 0, 0, 0, 0, 0};
+static const uint32_t b128[8] = {0, 0, 0, 0, 1, 0, 0, 0};
 
 /* the curve's p */
 static const uint32_t cp[8] = {
@@ -193,6 +229,12 @@ static const uint32_t npbmp[8] = {
 static const uint32_t npnmp[8] = {
     0xf8c64aa3, 0xe7739585, 0x4e2f3d09, 0x79cdf55a,
     0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
+};
+
+/* p - 1 */
+static const uint32_t pm1[8] = {
+    0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
+    0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -225,8 +267,6 @@ static void assert_cmov()
 
 static void assert_madd()
 {
-    const uint32_t word[8] = {-1u, 0, 0, 0, 0, 0, 0, 0};
-    const uint32_t b128[8] = {0, 0, 0, 0, 1, 0, 0, 0};
     uint32_t z[8];
 
     /* x + y < p */
@@ -242,13 +282,29 @@ static void assert_madd()
     assert(memcmp(z, npnmp, sizeof z) == 0);
 }
 
+static void assert_msub()
+{
+    uint32_t z[8];
+
+    /* x > y */
+    m256_sub(z, one, zero, cp);
+    assert(memcmp(z, one, sizeof z) == 0);
+
+    /* x == y */
+    m256_sub(z, one, one, cp);
+    assert(memcmp(z, zero, sizeof z) == 0);
+
+    /* x < y by few */
+    m256_sub(z, zero, one, cp);
+    assert(memcmp(z, pm1, sizeof z) == 0);
+
+    /* x < y by far */
+    m256_sub(z, zero, pm1, cp);
+    assert(memcmp(z, one, sizeof z) == 0);
+}
+
 int main(void)
 {
-    const uint32_t zero[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    const uint32_t one[8] = {1, 0, 0, 0, 0, 0, 0, 0};
-    const uint32_t mone[8] = {-1u, -1u, -1u, -1u, -1u, -1u, -1u, -1u};
-    const uint32_t word[8] = {-1u, 0, 0, 0, 0, 0, 0, 0};
-    const uint32_t b128[8] = {0, 0, 0, 0, 1, 0, 0, 0};
 
 #if 0
     test_add("0+0", zero, zero);
@@ -294,9 +350,17 @@ int main(void)
     test_sub("w-w", word, word);
 #else
     /* Just to keep the functions and variables used */
+    printf("constants\n");
+    print_u256("p", cp, 0);
+    print_u256("n", cn, 0);
+
+    printf("u256\n");
     test_add("w+m", word, mone);
     test_sub("0-1", zero, one);
+
+    printf("m256\n");
     test_madd("n+b", cp, cn, b128);
+    test_msub("w-1", cp, word, one);
 #endif
 
     assert_add(r, s, rps, 0u);
@@ -307,5 +371,6 @@ int main(void)
     assert_cmov();
 
     assert_madd();
+    assert_msub();
 }
 #endif
