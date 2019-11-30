@@ -80,6 +80,33 @@ STATIC void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
 
 /**********************************************************************
  *
+ * Operations modulo p or n
+ *
+ **********************************************************************/
+
+/*
+ * Modular addition
+ *
+ * in: x, y in [0, m)
+ *     m in [0, 2^256)
+ * out: z = (x + y) mod m, in [0, m)
+ */
+STATIC void m256_add(uint32_t z[8],
+                     const uint32_t x[8], const uint32_t y[8],
+                     const uint32_t m[8])
+{
+    uint32_t r[8];
+    uint32_t carry_add = u256_add(z, x, y);
+    uint32_t carry_sub = u256_sub(r, z, m);
+    /* Need to subract m if:
+     *      x+y >= 2^256 > m (that is, carry_add == 1)
+     *   OR z >= m (that is, carry_sub == 0) */
+    uint32_t use_sub = carry_add | (1 - carry_sub);
+    u256_cmov(z, r, use_sub);
+}
+
+/**********************************************************************
+ *
  * Functions and data for testing and debugging
  *
  **********************************************************************/
@@ -109,6 +136,14 @@ static void test_sub(const char *name,
     print_u256(name, z, c);
 }
 
+static void test_madd(const char *name, const uint32_t m[8],
+                      const uint32_t x[8], const uint32_t y[8])
+{
+    uint32_t z[8];
+    m256_add(z, x, y, m);
+    print_u256(name, z, 0);
+}
+
 static const uint32_t r[8] = {
     0xdcd1d063, 0x7d3d0eb8, 0x9c4ecc3c, 0xd937cbcb,
     0x0a14613e, 0xf76db5ed, 0xec0db49c, 0x760cd745,
@@ -128,6 +163,36 @@ static const uint32_t rms[8] = {
 static const uint32_t smr[8] = {
     0x7473c55f, 0x48a6f4f9, 0xb7f6305c, 0xda79fb21,
     0xa2b76ec0, 0xe6789c5c, 0x2601023a, 0xa12b3489,
+};
+
+/* the curve's p */
+static const uint32_t cp[8] = {
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
+    0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
+};
+
+/* the curve's n */
+static const uint32_t cn[8] = {
+    0xFC632551, 0xF3B9CAC2, 0xA7179E84, 0xBCE6FAAD,
+    0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
+};
+
+/* n + 2**32 - 1 mod p */
+static const uint32_t npwmp[8] = {
+    0xfc632550, 0xf3b9cac3, 0xa7179e84, 0xbce6faad,
+    0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
+};
+
+/* n + 2**128 mod p */
+static const uint32_t npbmp[8] = {
+    0xfc632552, 0xf3b9cac2, 0xa7179e84, 0xbce6faac,
+    0x00000000, 0x00000000, 0x00000000, 0x00000000,
+};
+
+/* n + n mod p */
+static const uint32_t npnmp[8] = {
+    0xf8c64aa3, 0xe7739585, 0x4e2f3d09, 0x79cdf55a,
+    0xffffffff, 0xffffffff, 0x00000000, 0xffffffff,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -158,12 +223,32 @@ static void assert_cmov()
     assert(memcmp(z, s, sizeof z) == 0);
 }
 
+static void assert_madd()
+{
+    const uint32_t word[8] = {-1u, 0, 0, 0, 0, 0, 0, 0};
+    const uint32_t b128[8] = {0, 0, 0, 0, 1, 0, 0, 0};
+    uint32_t z[8];
+
+    /* x + y < p */
+    m256_add(z, cn, word, cp);
+    assert(memcmp(z, npwmp, sizeof z) == 0);
+
+    /* p <= x + y < 2^256 */
+    m256_add(z, cn, b128, cp);
+    assert(memcmp(z, npbmp, sizeof z) == 0);
+
+    /* x + y >= 2^256 */
+    m256_add(z, cn, cn, cp);
+    assert(memcmp(z, npnmp, sizeof z) == 0);
+}
+
 int main(void)
 {
-    uint32_t zero[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    uint32_t one[8] = {1, 0, 0, 0, 0, 0, 0, 0};
-    uint32_t mone[8] = {-1u, -1u, -1u, -1u, -1u, -1u, -1u, -1u};
-    uint32_t word[8] = {-1u, 0, 0, 0, 0, 0, 0, 0};
+    const uint32_t zero[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    const uint32_t one[8] = {1, 0, 0, 0, 0, 0, 0, 0};
+    const uint32_t mone[8] = {-1u, -1u, -1u, -1u, -1u, -1u, -1u, -1u};
+    const uint32_t word[8] = {-1u, 0, 0, 0, 0, 0, 0, 0};
+    const uint32_t b128[8] = {0, 0, 0, 0, 1, 0, 0, 0};
 
 #if 0
     test_add("0+0", zero, zero);
@@ -211,6 +296,7 @@ int main(void)
     /* Just to keep the functions and variables used */
     test_add("w+m", word, mone);
     test_sub("0-1", zero, one);
+    test_madd("n+b", cp, cn, b128);
 #endif
 
     assert_add(r, s, rps, 0u);
@@ -219,5 +305,7 @@ int main(void)
     assert_sub(s, r, smr, 1u);
 
     assert_cmov();
+
+    assert_madd();
 }
 #endif
