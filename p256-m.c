@@ -63,6 +63,21 @@ STATIC uint32_t u256_sub(uint32_t z[8],
     return carry;
 }
 
+/*
+ * 256-bit conditional assignment
+ *
+ * in: x in [0, 2^256)
+ *     c in [0, 1]
+ * out: z = x if c == 1, z unchanged otherwise
+ */
+STATIC void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
+{
+    const uint32_t x_mask = -c;
+    for (unsigned i = 0; i < 8; i++) {
+        z[i] = (z[i] & ~x_mask) | (x[i] & x_mask);
+    }
+}
+
 /**********************************************************************
  *
  * Functions and data for testing and debugging
@@ -133,6 +148,16 @@ static void assert_sub(const uint32_t x[8], const uint32_t y[8],
     assert(myc == c);
 }
 
+static void assert_cmov()
+{
+    uint32_t z[8];
+    memcpy(z, r, sizeof z);
+    u256_cmov(z, s, 0u);
+    assert(memcmp(z, r, sizeof z) == 0);
+    u256_cmov(z, s, 1u);
+    assert(memcmp(z, s, sizeof z) == 0);
+}
+
 int main(void)
 {
     uint32_t zero[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -192,5 +217,7 @@ int main(void)
 
     assert_sub(r, s, rms, 0u);
     assert_sub(s, r, smr, 1u);
+
+    assert_cmov();
 }
 #endif
