@@ -14,11 +14,13 @@ def c_print(name, val):
         val >>=32
     print('\n};')
 
-r = random.randrange(2**256)
-s = random.randrange(2**256)
 
-c_print('r', r)
-c_print('s', s)
-c_print('rps', r + s)
-c_print('rms', r - s)
-c_print('smr', s - r)
+if __name__ == '__main__':
+    r = random.randrange(2**256)
+    s = random.randrange(2**256)
+
+    c_print('r', r)
+    c_print('s', s)
+    c_print('rps', r + s)
+    c_print('rms', r - s)
+    c_print('smr', s - r)

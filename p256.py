@@ -26,11 +26,14 @@ class ModInt:
     def __sub__(self, other):
         return ModInt(self.x - other.x, self.n)
 
+    def __neg__(self):
+        return ModInt(-self.x, self.n)
+
     def __mul__(self, other):
         return ModInt(self.x * other.x, self.n)
 
     def __rmul__(self, other):
-        """Mulitply self by an integer"""
+        """Multiply self by an integer"""
         return ModInt(self.x * other, self.n)
 
     def __pow__(self, other):

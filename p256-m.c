@@ -14,10 +14,10 @@
 
 /**********************************************************************
  *
- * Operations on 256-bit unsigned integers
+ * Operations on fixed-width unsigned integers
  *
  * Represented using 32-bit limbs, least significant limb first.
- * That is: x = x[0] + 2^32 x[1] + ... + 2^224 x[7]
+ * That is: x = x[0] + 2^32 x[1] + ... + 2^224 x[7] for 256-bit.
  *
  **********************************************************************/
 
@@ -80,9 +80,69 @@ STATIC void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
     }
 }
 
+/*
+ * 288 + 32 x 256 -> 288-bit multiply and add
+ *
+ * in: x in [0, 2^32)
+ *     y in [0, 2^256)
+ *     z in [0, 2^288)
+ * out: z_out = z_in + x * y mod 2^288
+ *      c     = z_in + x * y div 2^288
+ * That is, z_out + c * 2^288 = z_in + x * y
+ *
+ * This is a helper for Montgomery multiplication.
+ */
+static uint32_t u288_muladd(uint32_t z[9],
+                            uint32_t x, const uint32_t y[8])
+{
+    uint32_t carry = 0;
+
+    for (unsigned i = 0; i < 8; i++) {
+        uint64_t prod = (uint64_t) x * y[i] + z[i] + carry;
+        z[i] = (uint32_t) prod;
+        carry = (uint32_t) (prod >> 32);
+    }
+
+    uint64_t sum = (uint64_t) z[8] + carry;
+    z[8] = (uint32_t) sum;
+    carry = (uint32_t) (sum >> 32);
+
+    return carry;
+}
+
+/*
+ * 288-bit in-place right shift by 32 bits
+ *
+ * in: z in [0, 2^288)
+ *     c in [0, 2^32)
+ * out: z_out = z_in div 2^32 + c * 2^256
+ *            = (z_in + c * 2^288) div 2^32
+ *
+ * This is a helper for Montgomery multiplication.
+ */
+static void u288_rshift32(uint32_t z[9], uint32_t c)
+{
+        for (unsigned i = 0; i < 8; i++) {
+            z[i] = z[i+1];
+        }
+        z[8] = c;
+}
+
 /**********************************************************************
  *
- * Operations modulo p or n
+ * Operations modulo a 256-bit prime m
+ *
+ * These are done in the Montgomery domain, that is x is represented by
+ *  x * 2^256 mod m
+ * Numbers need to be converted to that domain before computations,
+ * and back from it afterwards.
+ *
+ * Inversion is computed using Fermat's little theorem.
+ *
+ * Montgomery operations require that m is odd,
+ * and Fermat's little theorem require it to be a prime.
+ * In practice operations are done modulo the curve's p and n,
+ * both of which are large primes.
  *
  **********************************************************************/
 
@@ -122,9 +182,43 @@ STATIC void m256_sub(uint32_t z[8],
     uint32_t carry = u256_sub(z, x, y);
     (void) u256_add(r, z, m);
     /* Need to add m if and only if x < y, that is carry == 1.
-     * In that case z is in [2^256 - p + 1, 2^256 - 1], so the
+     * In that case z is in [2^256 - m + 1, 2^256 - 1], so the
      * addition will have a carry as well, which cancels out. */
     u256_cmov(z, r, carry);
+}
+
+/*
+ * Montgomery modular multiplication
+ *
+ * in: x, y in [0, m)
+ *     m in [0, 2**256), must be odd
+ *     m_prime must be -m^-1 mod 2^32
+ * out: z = (x * y) / 2^256 mod m, in [0, m)
+ *
+ * Algorithm 14.36 in Handbook of Applied Cryptography with:
+ * b = 2^32, n = 8, R = 2^256
+ */
+STATIC void m256_mul(uint32_t z[8],
+                     const uint32_t x[8], const uint32_t y[8],
+                     const uint32_t m[8], uint32_t m_prime)
+{
+    uint32_t a[9] = { 0 };
+
+    for (unsigned i = 0; i < 8; i++) {
+        /* the "mod 2^32" is implicit from the type */
+        uint32_t u = (a[0] + x[i] * y[0]) * m_prime;
+
+        /* a = (a + x[i] * y + u * m) div b */
+        uint32_t c = u288_muladd(a, x[i], y);
+        c += u288_muladd(a, u, m);
+        u288_rshift32(a, c);
+    }
+
+    /* a = a > m ? a - m : a */
+    uint32_t carry_add = a[8]; // 0 or 1 since a < 2m, see HAC Note 14.37
+    uint32_t carry_sub = u256_sub(z, a, m);
+    uint32_t use_sub = carry_add | (1 - carry_sub); // see m256_add()
+    u256_cmov(z, a, 1 - use_sub);
 }
 
 /**********************************************************************
@@ -213,6 +307,12 @@ static const uint32_t cn[8] = {
     0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
 };
 
+/* -p^-1 mod 32 */
+static const uint32_t cpi = 1;
+
+/* -n^-1 mod 32 */
+static const uint32_t cni = 0xee00bc4f;
+
 /* n + 2**32 - 1 mod p */
 static const uint32_t npwmp[8] = {
     0xfc632550, 0xf3b9cac3, 0xa7179e84, 0xbce6faad,
@@ -235,6 +335,18 @@ static const uint32_t npnmp[8] = {
 static const uint32_t pm1[8] = {
     0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
     0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
+};
+
+/* r * s / 2^256 mod p */
+static const uint32_t rsRip[8] = {
+    0x82f52d8b, 0xa771a352, 0x262dcb9c, 0x523cbab8,
+    0x1d8cbcee, 0x0f1808ad, 0x693cd97e, 0x899b52d1,
+};
+
+/* r * s / 2^256 mod n */
+static const uint32_t rsRin[8] = {
+    0x37ac4273, 0xb2c0f863, 0xc22f08f1, 0x00db3b58,
+    0x2c404b3a, 0x572adc0c, 0x8c4d944d, 0x831900ac,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -301,6 +413,17 @@ static void assert_msub()
     /* x < y by far */
     m256_sub(z, zero, pm1, cp);
     assert(memcmp(z, one, sizeof z) == 0);
+}
+
+static void assert_mmul(void)
+{
+    uint32_t z[8];
+
+    m256_mul(z, r, s, cp, cpi);
+    assert(memcmp(z, rsRip, sizeof z) == 0);
+
+    m256_mul(z, r, s, cn, cni);
+    assert(memcmp(z, rsRin, sizeof z) == 0);
 }
 
 int main(void)
@@ -372,5 +495,6 @@ int main(void)
 
     assert_madd();
     assert_msub();
+    assert_mmul();
 }
 #endif
