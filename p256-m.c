@@ -22,6 +22,20 @@
  **********************************************************************/
 
 /*
+ * 256-bit set to 32-bit value
+ *
+ * in: x in [0, 2^32)
+ * out: z = x
+ */
+STATIC void u256_set32(uint32_t z[8], uint32_t x)
+{
+    z[0] = x;
+    for (unsigned i = 1; i < 8; i++) {
+        z[i] = 0;
+    }
+}
+
+/*
  * 256-bit addition
  *
  * in: x, y in [0, 2^256)
@@ -192,7 +206,7 @@ STATIC void m256_sub(uint32_t z[8],
  *
  * in: x, y in [0, m)
  *     m in [0, 2**256), must be odd
- *     m_prime must be -m^-1 mod 2^32
+ *     m_prime in [0, 2^32) must be -m^-1 mod 2^32
  * out: z = (x * y) / 2^256 mod m, in [0, m)
  *
  * Algorithm 14.36 in Handbook of Applied Cryptography with:
@@ -219,6 +233,38 @@ STATIC void m256_mul(uint32_t z[8],
     uint32_t carry_sub = u256_sub(z, a, m);
     uint32_t use_sub = carry_add | (1 - carry_sub); // see m256_add()
     u256_cmov(z, a, 1 - use_sub);
+}
+
+/*
+ * In-place conversion to Montgomery form
+ *
+ * in: z in [0, m)
+ *     m in [0, 2^256), must be odd
+ *     R2m in [0, m), must be 2^512 mod m
+ *     m_prime in [0, 2^32) must be -m^-1 mod 2^32
+ * out: z_out = z_in * 2^256 mod m, in [0, m)
+ */
+STATIC void m256_prep(uint32_t z[8], const uint32_t m[8],
+                      const uint32_t R2m[8], uint32_t m_prime)
+{
+    m256_mul(z, z, R2m, m, m_prime);
+}
+
+/*
+ * In-place conversion from Montgomery form
+ *
+ * in: z in [0, m)
+ *     m in [0, 2^256), must be odd
+ *     m_prime in [0, 2^32) must be -m^-1 mod 2^32
+ * out: z_out = z_in / 2^256 mod m, in [0, m)
+ * That is, z_in was z_actual * 2^256 mod m, and z_out is z_actual
+ */
+STATIC void m256_done(uint32_t z[8], const uint32_t m[8],
+                      uint32_t m_prime)
+{
+    uint32_t one[8];
+    u256_set32(one, 1);
+    m256_mul(z, z, one, m, m_prime);
 }
 
 /**********************************************************************
@@ -313,6 +359,19 @@ static const uint32_t cpi = 1;
 /* -n^-1 mod 32 */
 static const uint32_t cni = 0xee00bc4f;
 
+/* 2^512 mod p */
+static const uint32_t R2p[8] = {
+    0x00000003, 0x00000000, 0xffffffff, 0xfffffffb,
+    0xfffffffe, 0xffffffff, 0xfffffffd, 0x00000004,
+};
+
+/* 2^512 mod n */
+static const uint32_t R2n[8] = {
+    0xbe79eea2, 0x83244c95, 0x49bd6fa6, 0x4699799c,
+    0x2b6bec59, 0x2845b239, 0xf3d95620, 0x66e12d94,
+};
+
+
 /* n + 2**32 - 1 mod p */
 static const uint32_t npwmp[8] = {
     0xfc632550, 0xf3b9cac3, 0xa7179e84, 0xbce6faad,
@@ -347,6 +406,18 @@ static const uint32_t rsRip[8] = {
 static const uint32_t rsRin[8] = {
     0x37ac4273, 0xb2c0f863, 0xc22f08f1, 0x00db3b58,
     0x2c404b3a, 0x572adc0c, 0x8c4d944d, 0x831900ac,
+};
+
+/* r * s mod p */
+static const uint32_t rtsmp[8] = {
+    0x4248770d, 0xae227d04, 0x767a5157, 0x3aa8d449,
+    0xf4e6f5c5, 0x01da90d2, 0x339e69ec, 0x7ab7da11,
+};
+
+/* r * s mod n */
+static const uint32_t rtsmn[8] = {
+    0x423cddd0, 0xd6b649b6, 0x6513a38b, 0xb0a1c71b,
+    0xe5437d3f, 0xecc8e34d, 0x80d2de2e, 0x31c7183c,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -426,6 +497,38 @@ static void assert_mmul(void)
     assert(memcmp(z, rsRin, sizeof z) == 0);
 }
 
+static void assert_prep_mul_done(void)
+{
+    uint32_t rm[8], sm[8], z[8];
+
+    /* mod p */
+    memcpy(rm, r, sizeof rm);
+    memcpy(sm, s, sizeof rm);
+
+    m256_prep(rm, cp, R2p, cpi);
+    m256_prep(sm, cp, R2p, cpi);
+
+    m256_mul(z, rm, sm, cp, cpi);
+
+    m256_done(z, cp, cpi);
+
+    assert(memcmp(z, rtsmp, sizeof z) == 0);
+
+    /* mod n */
+    memcpy(rm, r, sizeof rm);
+    memcpy(sm, s, sizeof rm);
+
+    m256_prep(rm, cn, R2n, cni);
+    m256_prep(sm, cn, R2n, cni);
+
+    m256_mul(z, rm, sm, cn, cni);
+
+    m256_done(z, cn, cni);
+
+    assert(memcmp(z, rtsmn, sizeof z) == 0);
+
+}
+
 int main(void)
 {
 
@@ -496,5 +599,6 @@ int main(void)
     assert_madd();
     assert_msub();
     assert_mmul();
+    assert_prep_mul_done();
 }
 #endif
