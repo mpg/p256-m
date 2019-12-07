@@ -11,7 +11,8 @@ gcc() {
 }
 
 clang() {
-    env clang -Weverything -Wno-missing-prototypes --target=arm-none-eabi \
+    env clang -Weverything -Wno-missing-prototypes \
+        -Wno-missing-variable-declarations --target=arm-none-eabi \
         -Oz $CFLAGS_COMMON "$@"
 }
 

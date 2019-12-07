@@ -161,6 +161,46 @@ static void u288_rshift32(uint32_t z[9], uint32_t c)
  **********************************************************************/
 
 /*
+ * Primes associated to the curve, modulo which we'll compute
+ */
+STATIC const uint32_t cp[8] = { /* the curve's p */
+    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
+    0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
+};
+STATIC const uint32_t cn[8] = { /* the curve's n */
+    0xFC632551, 0xF3B9CAC2, 0xA7179E84, 0xBCE6FAAD,
+    0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
+};
+
+/*
+ * Montgomery constants associated to the above primes
+ *
+ * Order them in a tables with:
+ *  the value associated to p in position 1,
+ *  the value associated to n in position 0.
+ *
+ * This is a trick to allow selecting the proper value given m = p or n
+ * by using m[6] as the index in this table (see values or p and n above).
+ */
+static inline uint32_t table_index(const uint32_t m[8]) {
+    return m[6]; /* conveniently happens to be 0 for n, 1 for p */
+}
+static const uint32_t ni_np[2] = { /* negative inverses or n and p */
+    0xee00bc4f, /* -n^-1 mod 32 */
+    0x00000001, /* -p^-1 mod 32 */
+};
+static const uint32_t R2_np[2][8] = { /* R^2 mod n and p, with R = 2^256 */
+    { /* 2^512 mod n */
+        0xbe79eea2, 0x83244c95, 0x49bd6fa6, 0x4699799c,
+        0x2b6bec59, 0x2845b239, 0xf3d95620, 0x66e12d94,
+    },
+    { /* 2^512 mod p */
+        0x00000003, 0x00000000, 0xffffffff, 0xfffffffb,
+        0xfffffffe, 0xffffffff, 0xfffffffd, 0x00000004,
+    },
+};
+
+/*
  * Modular addition
  *
  * in: x, y in [0, m)
@@ -205,8 +245,7 @@ STATIC void m256_sub(uint32_t z[8],
  * Montgomery modular multiplication
  *
  * in: x, y in [0, m)
- *     m in [0, 2**256), must be odd
- *     m_prime in [0, 2^32) must be -m^-1 mod 2^32
+ *     m must be either p256_p or p256_n
  * out: z = (x * y) / 2^256 mod m, in [0, m)
  *
  * Algorithm 14.36 in Handbook of Applied Cryptography with:
@@ -214,8 +253,9 @@ STATIC void m256_sub(uint32_t z[8],
  */
 STATIC void m256_mul(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
-                     const uint32_t m[8], uint32_t m_prime)
+                     const uint32_t m[8])
 {
+    uint32_t m_prime = ni_np[table_index(m)];
     uint32_t a[9] = { 0 };
 
     for (unsigned i = 0; i < 8; i++) {
@@ -239,32 +279,29 @@ STATIC void m256_mul(uint32_t z[8],
  * In-place conversion to Montgomery form
  *
  * in: z in [0, m)
- *     m in [0, 2^256), must be odd
- *     R2m in [0, m), must be 2^512 mod m
- *     m_prime in [0, 2^32) must be -m^-1 mod 2^32
+ *     m must be either p256_p or p256_n
  * out: z_out = z_in * 2^256 mod m, in [0, m)
  */
-STATIC void m256_prep(uint32_t z[8], const uint32_t m[8],
-                      const uint32_t R2m[8], uint32_t m_prime)
+STATIC void m256_prep(uint32_t z[8], const uint32_t m[8])
 {
-    m256_mul(z, z, R2m, m, m_prime);
+    const uint32_t *R2m = R2_np[table_index(m)];
+
+    m256_mul(z, z, R2m, m);
 }
 
 /*
  * In-place conversion from Montgomery form
  *
  * in: z in [0, m)
- *     m in [0, 2^256), must be odd
- *     m_prime in [0, 2^32) must be -m^-1 mod 2^32
+ *     m must be either p256_p or p256_n
  * out: z_out = z_in / 2^256 mod m, in [0, m)
  * That is, z_in was z_actual * 2^256 mod m, and z_out is z_actual
  */
-STATIC void m256_done(uint32_t z[8], const uint32_t m[8],
-                      uint32_t m_prime)
+STATIC void m256_done(uint32_t z[8], const uint32_t m[8])
 {
     uint32_t one[8];
     u256_set32(one, 1);
-    m256_mul(z, z, one, m, m_prime);
+    m256_mul(z, z, one, m);
 }
 
 /**********************************************************************
@@ -340,37 +377,6 @@ static const uint32_t one[8] = {1, 0, 0, 0, 0, 0, 0, 0};
 static const uint32_t mone[8] = {-1u, -1u, -1u, -1u, -1u, -1u, -1u, -1u};
 static const uint32_t word[8] = {-1u, 0, 0, 0, 0, 0, 0, 0};
 static const uint32_t b128[8] = {0, 0, 0, 0, 1, 0, 0, 0};
-
-/* the curve's p */
-static const uint32_t cp[8] = {
-    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
-    0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
-};
-
-/* the curve's n */
-static const uint32_t cn[8] = {
-    0xFC632551, 0xF3B9CAC2, 0xA7179E84, 0xBCE6FAAD,
-    0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
-};
-
-/* -p^-1 mod 32 */
-static const uint32_t cpi = 1;
-
-/* -n^-1 mod 32 */
-static const uint32_t cni = 0xee00bc4f;
-
-/* 2^512 mod p */
-static const uint32_t R2p[8] = {
-    0x00000003, 0x00000000, 0xffffffff, 0xfffffffb,
-    0xfffffffe, 0xffffffff, 0xfffffffd, 0x00000004,
-};
-
-/* 2^512 mod n */
-static const uint32_t R2n[8] = {
-    0xbe79eea2, 0x83244c95, 0x49bd6fa6, 0x4699799c,
-    0x2b6bec59, 0x2845b239, 0xf3d95620, 0x66e12d94,
-};
-
 
 /* n + 2**32 - 1 mod p */
 static const uint32_t npwmp[8] = {
@@ -490,10 +496,10 @@ static void assert_mmul(void)
 {
     uint32_t z[8];
 
-    m256_mul(z, r, s, cp, cpi);
+    m256_mul(z, r, s, cp);
     assert(memcmp(z, rsRip, sizeof z) == 0);
 
-    m256_mul(z, r, s, cn, cni);
+    m256_mul(z, r, s, cn);
     assert(memcmp(z, rsRin, sizeof z) == 0);
 }
 
@@ -505,12 +511,12 @@ static void assert_prep_mul_done(void)
     memcpy(rm, r, sizeof rm);
     memcpy(sm, s, sizeof rm);
 
-    m256_prep(rm, cp, R2p, cpi);
-    m256_prep(sm, cp, R2p, cpi);
+    m256_prep(rm, cp);
+    m256_prep(sm, cp);
 
-    m256_mul(z, rm, sm, cp, cpi);
+    m256_mul(z, rm, sm, cp);
 
-    m256_done(z, cp, cpi);
+    m256_done(z, cp);
 
     assert(memcmp(z, rtsmp, sizeof z) == 0);
 
@@ -518,15 +524,14 @@ static void assert_prep_mul_done(void)
     memcpy(rm, r, sizeof rm);
     memcpy(sm, s, sizeof rm);
 
-    m256_prep(rm, cn, R2n, cni);
-    m256_prep(sm, cn, R2n, cni);
+    m256_prep(rm, cn);
+    m256_prep(sm, cn);
 
-    m256_mul(z, rm, sm, cn, cni);
+    m256_mul(z, rm, sm, cn);
 
-    m256_done(z, cn, cni);
+    m256_done(z, cn);
 
     assert(memcmp(z, rtsmn, sizeof z) == 0);
-
 }
 
 int main(void)
