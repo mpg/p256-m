@@ -163,11 +163,11 @@ static void u288_rshift32(uint32_t z[9], uint32_t c)
 /*
  * Primes associated to the curve, modulo which we'll compute
  */
-STATIC const uint32_t cp[8] = { /* the curve's p */
+STATIC const uint32_t p256_p[8] = { /* the curve's p */
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
     0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
 };
-STATIC const uint32_t cn[8] = { /* the curve's n */
+STATIC const uint32_t p256_n[8] = { /* the curve's n */
     0xFC632551, 0xF3B9CAC2, 0xA7179E84, 0xBCE6FAAD,
     0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
 };
@@ -182,14 +182,14 @@ STATIC const uint32_t cn[8] = { /* the curve's n */
  * This is a trick to allow selecting the proper value given m = p or n
  * by using m[6] as the index in this table (see values or p and n above).
  */
-static inline uint32_t table_index(const uint32_t m[8]) {
+static inline uint32_t m256_mont_idx(const uint32_t m[8]) {
     return m[6]; /* conveniently happens to be 0 for n, 1 for p */
 }
-static const uint32_t ni_np[2] = { /* negative inverses or n and p */
+static const uint32_t m256_mont_ni[2] = { /* negative inverses or n and p */
     0xee00bc4f, /* -n^-1 mod 32 */
     0x00000001, /* -p^-1 mod 32 */
 };
-static const uint32_t R2_np[2][8] = { /* R^2 mod n and p, with R = 2^256 */
+static const uint32_t m256_mont_R2[2][8] = { /* R^2 mod n and p, with R = 2^256 */
     { /* 2^512 mod n */
         0xbe79eea2, 0x83244c95, 0x49bd6fa6, 0x4699799c,
         0x2b6bec59, 0x2845b239, 0xf3d95620, 0x66e12d94,
@@ -255,7 +255,7 @@ STATIC void m256_mul(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
                      const uint32_t m[8])
 {
-    uint32_t m_prime = ni_np[table_index(m)];
+    uint32_t m_prime = m256_mont_ni[m256_mont_idx(m)];
     uint32_t a[9] = { 0 };
 
     for (unsigned i = 0; i < 8; i++) {
@@ -284,7 +284,7 @@ STATIC void m256_mul(uint32_t z[8],
  */
 STATIC void m256_prep(uint32_t z[8], const uint32_t m[8])
 {
-    const uint32_t *R2m = R2_np[table_index(m)];
+    const uint32_t *R2m = m256_mont_R2[m256_mont_idx(m)];
 
     m256_mul(z, z, R2m, m);
 }
@@ -459,15 +459,15 @@ static void assert_madd()
     uint32_t z[8];
 
     /* x + y < p */
-    m256_add(z, cn, word, cp);
+    m256_add(z, p256_n, word, p256_p);
     assert(memcmp(z, npwmp, sizeof z) == 0);
 
     /* p <= x + y < 2^256 */
-    m256_add(z, cn, b128, cp);
+    m256_add(z, p256_n, b128, p256_p);
     assert(memcmp(z, npbmp, sizeof z) == 0);
 
     /* x + y >= 2^256 */
-    m256_add(z, cn, cn, cp);
+    m256_add(z, p256_n, p256_n, p256_p);
     assert(memcmp(z, npnmp, sizeof z) == 0);
 }
 
@@ -476,19 +476,19 @@ static void assert_msub()
     uint32_t z[8];
 
     /* x > y */
-    m256_sub(z, one, zero, cp);
+    m256_sub(z, one, zero, p256_p);
     assert(memcmp(z, one, sizeof z) == 0);
 
     /* x == y */
-    m256_sub(z, one, one, cp);
+    m256_sub(z, one, one, p256_p);
     assert(memcmp(z, zero, sizeof z) == 0);
 
     /* x < y by few */
-    m256_sub(z, zero, one, cp);
+    m256_sub(z, zero, one, p256_p);
     assert(memcmp(z, pm1, sizeof z) == 0);
 
     /* x < y by far */
-    m256_sub(z, zero, pm1, cp);
+    m256_sub(z, zero, pm1, p256_p);
     assert(memcmp(z, one, sizeof z) == 0);
 }
 
@@ -496,10 +496,10 @@ static void assert_mmul(void)
 {
     uint32_t z[8];
 
-    m256_mul(z, r, s, cp);
+    m256_mul(z, r, s, p256_p);
     assert(memcmp(z, rsRip, sizeof z) == 0);
 
-    m256_mul(z, r, s, cn);
+    m256_mul(z, r, s, p256_n);
     assert(memcmp(z, rsRin, sizeof z) == 0);
 }
 
@@ -511,12 +511,12 @@ static void assert_prep_mul_done(void)
     memcpy(rm, r, sizeof rm);
     memcpy(sm, s, sizeof rm);
 
-    m256_prep(rm, cp);
-    m256_prep(sm, cp);
+    m256_prep(rm, p256_p);
+    m256_prep(sm, p256_p);
 
-    m256_mul(z, rm, sm, cp);
+    m256_mul(z, rm, sm, p256_p);
 
-    m256_done(z, cp);
+    m256_done(z, p256_p);
 
     assert(memcmp(z, rtsmp, sizeof z) == 0);
 
@@ -524,12 +524,12 @@ static void assert_prep_mul_done(void)
     memcpy(rm, r, sizeof rm);
     memcpy(sm, s, sizeof rm);
 
-    m256_prep(rm, cn);
-    m256_prep(sm, cn);
+    m256_prep(rm, p256_n);
+    m256_prep(sm, p256_n);
 
-    m256_mul(z, rm, sm, cn);
+    m256_mul(z, rm, sm, p256_n);
 
-    m256_done(z, cn);
+    m256_done(z, p256_n);
 
     assert(memcmp(z, rtsmn, sizeof z) == 0);
 }
@@ -582,16 +582,16 @@ int main(void)
 #else
     /* Just to keep the functions and variables used */
     printf("constants\n");
-    print_u256("p", cp, 0);
-    print_u256("n", cn, 0);
+    print_u256("p", p256_p, 0);
+    print_u256("n", p256_n, 0);
 
     printf("u256\n");
     test_add("w+m", word, mone);
     test_sub("0-1", zero, one);
 
     printf("m256\n");
-    test_madd("n+b", cp, cn, b128);
-    test_msub("w-1", cp, word, one);
+    test_madd("n+b", p256_p, p256_n, b128);
+    test_msub("w-1", p256_p, word, one);
 #endif
 
     assert_add(r, s, rps, 0u);
