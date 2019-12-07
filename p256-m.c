@@ -304,6 +304,53 @@ STATIC void m256_done(uint32_t z[8], const uint32_t m[8])
     m256_mul(z, z, one, m);
 }
 
+/*
+ * Modular inversion in Montgomery form
+ *
+ * in: x in [0, m)
+ *     m must be either p256_p or p256_n
+ * out: z = = x^-1 * 2^512 mod m
+ * That is, if x = x_actual    * 2^256 mod m, then
+ *             z = x_actual^-1 * 2^256 mod m
+ *
+ * Caution: z and x must be disjoint memory locations.
+ */
+STATIC void m256_inv(uint32_t z[8], const uint32_t x[8], const uint32_t m[8])
+{
+    /*
+     * Use Fermat's little theorem to compute x^-1 as x^(m-2).
+     *
+     * Take advantage of the fact that both p's and n's least significant limb
+     * is greater that 2 to perform the subtraction on the flight (no carry).
+     *
+     * Use plain right-to-left binary exponentiation;
+     * branches are OK as the exponent is not a secret.
+     */
+    u256_set32(z, 1);
+    m256_prep(z, m);
+
+    uint32_t bitval[8];
+    u256_cmov(bitval, x, 1);
+
+    unsigned i = 0;
+    uint32_t limb = m[i] - 2;
+    while (1) {
+        for (unsigned j = 0; j < 32; j++) {
+            if ((limb & 1) != 0) {
+                m256_mul(z, z, bitval, m);
+            }
+            m256_mul(bitval, bitval, bitval, m);
+            limb >>= 1;
+        }
+
+        if (i == 7)
+            break;
+
+        i++;
+        limb = m[i];
+    }
+}
+
 /**********************************************************************
  *
  * Functions and data for testing and debugging
@@ -426,6 +473,18 @@ static const uint32_t rtsmn[8] = {
     0xe5437d3f, 0xecc8e34d, 0x80d2de2e, 0x31c7183c,
 };
 
+/* r^-1 mod p */
+static const uint32_t rip[8] = {
+    0x514828bf, 0xb98d5fdc, 0x705423b5, 0x547ecba2,
+    0xc433b9d7, 0x5c353713, 0x95d128fe, 0xf0f207dc,
+};
+
+/* r^-1 mod n */
+static const uint32_t rin[8] = {
+    0x9b056a09, 0x1c0e8002, 0x4ce07edc, 0xe0a2e9d2,
+    0x549e5b84, 0x9dd2b102, 0x6749fe75, 0x5decae3f,
+};
+
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
                        const uint32_t z[8], uint32_t c)
 {
@@ -534,6 +593,23 @@ static void assert_prep_mul_done(void)
     assert(memcmp(z, rtsmn, sizeof z) == 0);
 }
 
+static void assert_inv(void)
+{
+    uint32_t rm[8], z[8];
+
+    memcpy(rm, r, sizeof rm);
+    m256_prep(rm, p256_p);
+    m256_inv(z, rm, p256_p);
+    m256_done(z, p256_p);
+    assert(memcmp(z, rip, sizeof z) == 0);
+
+    memcpy(rm, r, sizeof rm);
+    m256_prep(rm, p256_n);
+    m256_inv(z, rm, p256_n);
+    m256_done(z, p256_n);
+    assert(memcmp(z, rin, sizeof z) == 0);
+}
+
 int main(void)
 {
 
@@ -605,5 +681,6 @@ int main(void)
     assert_msub();
     assert_mmul();
     assert_prep_mul_done();
+    assert_inv();
 }
 #endif

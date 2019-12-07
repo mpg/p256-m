@@ -42,7 +42,8 @@ n = p256.n
 r = 0x760cd745ec0db49cf76db5ed0a14613ed937cbcb9c4ecc3c7d3d0eb8dcd1d063
 s = 0x17380bcf120eb6d7dde65249accbcfffb3b1c6ed5444fc98c5e403b2514595c2
 
-print_val("rsRip", r, s, p)
-print_val("rsRin", r, s, n)
+#print_val("rsRip", r, s, p)
+#print_val("rsRin", r, s, n)
 
-
+c_print("rip", int(ModInt(r, p).inv()))
+c_print("rin", int(ModInt(r, n).inv()))
