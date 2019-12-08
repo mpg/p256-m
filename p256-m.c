@@ -42,6 +42,8 @@ STATIC void u256_set32(uint32_t z[8], uint32_t x)
  * out: z = (x + y) mod 2^256
  *      c = (x + y) div 2^256
  * That is, z + c * 2^256 = x + y
+ *
+ * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
 STATIC uint32_t u256_add(uint32_t z[8],
                          const uint32_t x[8], const uint32_t y[8])
@@ -64,6 +66,8 @@ STATIC uint32_t u256_add(uint32_t z[8],
  * out: z = (x - y) mod 2^256
  *      c = 0 if x >=y, 1 otherwise
  * That is, z = c * 2^256 + x - y
+ *
+ * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
 STATIC uint32_t u256_sub(uint32_t z[8],
                          const uint32_t x[8], const uint32_t y[8])
@@ -85,6 +89,8 @@ STATIC uint32_t u256_sub(uint32_t z[8],
  * in: x in [0, 2^256)
  *     c in [0, 1]
  * out: z = x if c == 1, z unchanged otherwise
+ *
+ * Note: as a memory area, z must be either equal to x, or not overlap.
  */
 STATIC void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
 {
@@ -103,6 +109,8 @@ STATIC void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
  * out: z_out = z_in + x * y mod 2^288
  *      c     = z_in + x * y div 2^288
  * That is, z_out + c * 2^288 = z_in + x * y
+ *
+ * Note: as a memory area, z must be either equal to y, or not overlap.
  *
  * This is a helper for Montgomery multiplication.
  */
@@ -206,6 +214,8 @@ static const uint32_t m256_mont_R2[2][8] = { /* R^2 mod n and p, with R = 2^256 
  * in: x, y in [0, m)
  *     m in [0, 2^256)
  * out: z = (x + y) mod m, in [0, m)
+ *
+ * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
 STATIC void m256_add(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
@@ -227,6 +237,8 @@ STATIC void m256_add(uint32_t z[8],
  * in: x, y in [0, m)
  *     m in [0, 2^256)
  * out: z = (x - y) mod m, in [0, m)
+ *
+ * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
 STATIC void m256_sub(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
@@ -248,13 +260,16 @@ STATIC void m256_sub(uint32_t z[8],
  *     m must be either p256_p or p256_n
  * out: z = (x * y) / 2^256 mod m, in [0, m)
  *
- * Algorithm 14.36 in Handbook of Applied Cryptography with:
- * b = 2^32, n = 8, R = 2^256
+ * Note: as a memory area, z may overlap with x or y.
  */
 STATIC void m256_mul(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
                      const uint32_t m[8])
 {
+    /*
+     * Algorithm 14.36 in Handbook of Applied Cryptography with:
+     * b = 2^32, n = 8, R = 2^256
+     */
     uint32_t m_prime = m256_mont_ni[m256_mont_idx(m)];
     uint32_t a[9] = { 0 };
 
@@ -313,7 +328,7 @@ STATIC void m256_done(uint32_t z[8], const uint32_t m[8])
  * That is, if x = x_actual    * 2^256 mod m, then
  *             z = x_actual^-1 * 2^256 mod m
  *
- * Caution: z and x must be disjoint memory locations.
+ * Note: as a memory area, z may overlap with x or y.
  */
 STATIC void m256_inv(uint32_t z[8], const uint32_t x[8], const uint32_t m[8])
 {
@@ -326,11 +341,11 @@ STATIC void m256_inv(uint32_t z[8], const uint32_t x[8], const uint32_t m[8])
      * Use plain right-to-left binary exponentiation;
      * branches are OK as the exponent is not a secret.
      */
+    uint32_t bitval[8];
+    u256_cmov(bitval, x, 1); /* copy x before writing to z */
+
     u256_set32(z, 1);
     m256_prep(z, m);
-
-    uint32_t bitval[8];
-    u256_cmov(bitval, x, 1);
 
     unsigned i = 0;
     uint32_t limb = m[i] - 2;
