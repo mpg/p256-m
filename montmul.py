@@ -48,10 +48,17 @@ s = 0x17380bcf120eb6d7dde65249accbcfffb3b1c6ed5444fc98c5e403b2514595c2
 #c_print("rip", int(ModInt(r, p).inv()))
 #c_print("rin", int(ModInt(r, n).inv()))
 
-c_print("p256_b", int(p256.b * ModInt(b**8, p256.p)))
-c_print("p256_Gx", int(p256.gx * ModInt(b**8, p256.p)))
-c_print("p256_Gy", int(p256.gy * ModInt(b**8, p256.p)))
+# c_print("p256_b", int(p256.b * ModInt(b**8, p256.p)))
+# c_print("p256_Gx", int(p256.gx * ModInt(b**8, p256.p)))
+# c_print("p256_Gy", int(p256.gy * ModInt(b**8, p256.p)))
 
-c_print("b_raw", int(p256.b))
-c_print("gx_raw", int(p256.gx))
-c_print("gy_raw", int(p256.gy))
+# c_print("b_raw", int(p256.b))
+# c_print("gx_raw", int(p256.gx))
+# c_print("gy_raw", int(p256.gy))
+
+Rp = ModInt(b**8, p)
+z = ModInt(r*s, p)
+c_print("jac_gx", int(p256.gx * z**2 * Rp))
+c_print("jac_gy", int(p256.gy * z**3 * Rp))
+c_print("jac_gz", int(z * Rp))
+

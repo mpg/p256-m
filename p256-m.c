@@ -396,6 +396,11 @@ STATIC void m256_inv(uint32_t z[8], const uint32_t x[8],
  * In either case, coordinates are integers modulo p256_p and
  * are always represented in the Montgomery domain.
  *
+ * For background on jacobian coordinates, see for example [GECC] 3.2.2
+ *
+ * [GECC]: Guide to Elliptic Curve Cryptography - Hankerson, Menezes,
+ * Vanstone; Springer, 2004.
+ *
  **********************************************************************/
 
 /*
@@ -424,8 +429,7 @@ STATIC const uint32_t p256_gy[8] = { /* G_y * 2^256 mod p */
 /*
  * Point-on-curve check - do the coordinates satisfy the curve's equation?
  *
- * in: x in [0, p)
- *     y in [0, p)
+ * in: x, y in [0, p)   (Montgomery domain)
  * out: 0 if the point lies on the curve, unspecified non-zero otherwise
  */
 STATIC uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
@@ -443,6 +447,27 @@ STATIC uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
     m256_add(rhs, rhs, p256_b, p256_p); /* x^3 - 3x + b */
 
     return u256_diff(lhs, rhs);
+}
+
+/*
+ * In-place jacobian to affine coordinate conversion
+ *
+ * in: x, y, z in [0, p)        (Montgomery domain)
+ * out: x_out = x_in / z_in^2   (Montgomery domain)
+ *      y_out = y_in / z_in^3   (Montgomery domain)
+ *      z_out unspecified, must be disregarded
+ */
+STATIC void point_to_affine(uint32_t x[8], uint32_t y[8], uint32_t z[8])
+{
+    uint32_t t[8];
+
+    m256_inv(z, z, p256_p);     /* z = z^-1 */
+
+    m256_mul(t, z, z, p256_p);  /* t = z^-2 */
+    m256_mul(x, x, t, p256_p);  /* x = x * z^-2 */
+
+    m256_mul(t, t, z, p256_p);  /* t = z^-3 */
+    m256_mul(y, y, t, p256_p);  /* y = y * z^-3 */
 }
 
 /**********************************************************************
@@ -562,6 +587,20 @@ static const uint32_t gx_raw[8] = {
 static const uint32_t gy_raw[8] = {
     0x37bf51f5, 0xcbb64068, 0x6b315ece, 0x2bce3357,
     0x7c0f9e16, 0x8ee7eb4a, 0xfe1a7f9b, 0x4fe342e2,
+};
+
+/* some jacobian coordinates for the base point, in Montgomery domain */
+static const uint32_t jac_gx[8] = {
+    0xc7998061, 0x75d76ddd, 0x62454d48, 0x2d434483,
+    0xd24a0728, 0x03f8d955, 0x1fae694f, 0x5f4b18c2,
+};
+static const uint32_t jac_gy[8] = {
+    0x2666a327, 0xe5e92860, 0x2c65268b, 0xf8cd5cfe,
+    0x0a10503e, 0xd7491c98, 0xb2ceff1a, 0xb72a1c2e,
+};
+static const uint32_t jac_gz[8] = {
+    0x8b622f45, 0x7f8503c6, 0x00f250d0, 0xf5d756cc,
+    0xfc84a8bf, 0x3486a9ed, 0xa1ba8ea7, 0x0a8b5909,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -715,6 +754,20 @@ static void assert_pt_check(void)
     assert(point_check(p256_gy, p256_gy) != 0);
 }
 
+static void assert_pt_affine(void)
+{
+    uint32_t x[8], y[8], z[8];
+
+    u256_cmov(x, jac_gx, 1);
+    u256_cmov(y, jac_gy, 1);
+    u256_cmov(z, jac_gz, 1);
+
+    point_to_affine(x, y, z);
+
+    assert(memcmp(x, p256_gx, sizeof x) == 0);
+    assert(memcmp(y, p256_gy, sizeof y) == 0);
+}
+
 int main(void)
 {
     /* Just to keep the function used */
@@ -735,5 +788,6 @@ int main(void)
 
     assert_pt_params();
     assert_pt_check();
+    assert_pt_affine();
 }
 #endif
