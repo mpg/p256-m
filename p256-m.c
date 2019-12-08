@@ -101,6 +101,22 @@ static void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
 }
 
 /*
+ * 256-bit compare for equality
+ *
+ * in: x in [0, 2^256)
+ *     y in [0, 2^256)
+ * out: 0 if x == y, unspecified non-zero otherwise
+ */
+STATIC uint32_t u256_diff(const uint32_t x[8], const uint32_t y[8])
+{
+    uint32_t diff = 0;
+    for (unsigned i = 0; i < 8; i++) {
+        diff |= x[i] ^ y[i];
+    }
+    return diff;
+}
+
+/*
  * 288 + 32 x 256 -> 288-bit multiply and add
  *
  * in: x in [0, 2^32)
@@ -372,6 +388,65 @@ STATIC void m256_inv(uint32_t z[8], const uint32_t x[8],
 
 /**********************************************************************
  *
+ * Operations on curve points
+ *
+ * Points are represented in two coordinates system:
+ *  - affine (x, y)
+ *  - jacobian (x:y:z)
+ * In either case, coordinates are integers modulo p256_p and
+ * are always represented in the Montgomery domain.
+ *
+ **********************************************************************/
+
+/*
+ * The curve's b parameter in the Short Weierstrass equation
+ *  y^2 = x^3 - 3*x + b
+ * Compared to the standard, this is converted to the Montgomery domain.
+ */
+STATIC const uint32_t p256_b[8] = { /* b * 2^256 mod p */
+    0x29c4bddf, 0xd89cdf62, 0x78843090, 0xacf005cd,
+    0xf7212ed6, 0xe5a220ab, 0x04874834, 0xdc30061d,
+};
+
+/*
+ * The curve's conventional base point G.
+ * Compared to the standard, coordinates converted to the Montgomery domain.
+ */
+STATIC const uint32_t p256_gx[8] = { /* G_x * 2^256 mod p */
+    0x18a9143c, 0x79e730d4, 0x5fedb601, 0x75ba95fc,
+    0x77622510, 0x79fb732b, 0xa53755c6, 0x18905f76,
+};
+STATIC const uint32_t p256_gy[8] = { /* G_y * 2^256 mod p */
+    0xce95560a, 0xddf25357, 0xba19e45c, 0x8b4ab8e4,
+    0xdd21f325, 0xd2e88688, 0x25885d85, 0x8571ff18,
+};
+
+/*
+ * Point-on-curve check - do the coordinates satisfy the curve's equation?
+ *
+ * in: x in [0, p)
+ *     y in [0, p)
+ * out: 0 if the point lies on the curve, unspecified non-zero otherwise
+ */
+STATIC uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
+{
+    uint32_t lhs[8], rhs[8];
+
+    /* lhs = y^2 */
+    m256_mul(lhs, y, y, p256_p);
+
+    /* rhs = x^3 - 3x + b */
+    m256_mul(rhs, x,   x, p256_p);      /* x^2 */
+    m256_mul(rhs, rhs, x, p256_p);      /* x^3 */
+    for (unsigned i = 0; i < 3; i++)
+        m256_sub(rhs, rhs, x, p256_p);  /* x^3 - 3x */
+    m256_add(rhs, rhs, p256_b, p256_p); /* x^3 - 3x + b */
+
+    return u256_diff(lhs, rhs);
+}
+
+/**********************************************************************
+ *
  * Functions and data for testing and debugging
  *
  **********************************************************************/
@@ -473,6 +548,20 @@ static const uint32_t rip[8] = {
 static const uint32_t rin[8] = {
     0x9b056a09, 0x1c0e8002, 0x4ce07edc, 0xe0a2e9d2,
     0x549e5b84, 0x9dd2b102, 0x6749fe75, 0x5decae3f,
+};
+
+/* actual curve parameters (not in Montgomery domain) */
+static const uint32_t b_raw[8] = {
+    0x27d2604b, 0x3bce3c3e, 0xcc53b0f6, 0x651d06b0,
+    0x769886bc, 0xb3ebbd55, 0xaa3a93e7, 0x5ac635d8,
+};
+static const uint32_t gx_raw[8] = {
+    0xd898c296, 0xf4a13945, 0x2deb33a0, 0x77037d81,
+    0x63a440f2, 0xf8bce6e5, 0xe12c4247, 0x6b17d1f2,
+};
+static const uint32_t gy_raw[8] = {
+    0x37bf51f5, 0xcbb64068, 0x6b315ece, 0x2bce3357,
+    0x7c0f9e16, 0x8ee7eb4a, 0xfe1a7f9b, 0x4fe342e2,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -600,6 +689,32 @@ static void assert_inv(void)
     assert(memcmp(z, rin, sizeof z) == 0);
 }
 
+static void assert_pt_params(void)
+{
+    uint32_t z[8];
+
+    u256_cmov(z, p256_b, 1);
+    m256_done(z, p256_p);
+    assert(memcmp(z, b_raw, sizeof z) == 0);
+
+    u256_cmov(z, p256_gx, 1);
+    m256_done(z, p256_p);
+    assert(memcmp(z, gx_raw, sizeof z) == 0);
+
+    u256_cmov(z, p256_gy, 1);
+    m256_done(z, p256_p);
+    assert(memcmp(z, gy_raw, sizeof z) == 0);
+}
+
+static void assert_pt_check(void)
+{
+    assert(point_check(p256_gx, p256_gy) == 0);
+
+    assert(point_check(p256_gx, p256_gx) != 0);
+    assert(point_check(p256_gy, p256_gx) != 0);
+    assert(point_check(p256_gy, p256_gy) != 0);
+}
+
 int main(void)
 {
     /* Just to keep the function used */
@@ -617,5 +732,8 @@ int main(void)
     assert_mmul();
     assert_prep_mul_done();
     assert_inv();
+
+    assert_pt_params();
+    assert_pt_check();
 }
 #endif
