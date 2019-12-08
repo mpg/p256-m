@@ -385,38 +385,6 @@ static void print_u256(const char *name, const uint32_t x[8], uint32_t c)
     printf(" (%08x)\n", c);
 }
 
-static void test_add(const char *name,
-                     const uint32_t x[8], const uint32_t y[8])
-{
-    uint32_t z[8];
-    uint32_t c = u256_add(z, x, y);
-    print_u256(name, z, c);
-}
-
-static void test_sub(const char *name,
-                     const uint32_t x[8], const uint32_t y[8])
-{
-    uint32_t z[8];
-    uint32_t c = u256_sub(z, x, y);
-    print_u256(name, z, c);
-}
-
-static void test_madd(const char *name, const uint32_t m[8],
-                      const uint32_t x[8], const uint32_t y[8])
-{
-    uint32_t z[8];
-    m256_add(z, x, y, m);
-    print_u256(name, z, 0);
-}
-
-static void test_msub(const char *name, const uint32_t m[8],
-                      const uint32_t x[8], const uint32_t y[8])
-{
-    uint32_t z[8];
-    m256_sub(z, x, y, m);
-    print_u256(name, z, 0);
-}
-
 static const uint32_t r[8] = {
     0xdcd1d063, 0x7d3d0eb8, 0x9c4ecc3c, 0xd937cbcb,
     0x0a14613e, 0xf76db5ed, 0xec0db49c, 0x760cd745,
@@ -444,7 +412,6 @@ static const uint32_t smr[8] = {
 
 static const uint32_t zero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 static const uint32_t one[8] = { 1, 0, 0, 0, 0, 0, 0, 0 };
-static const uint32_t mone[8] = { -1u, -1u, -1u, -1u, -1u, -1u, -1u, -1u };
 static const uint32_t word[8] = { -1u, 0, 0, 0, 0, 0, 0, 0 };
 static const uint32_t b128[8] = { 0, 0, 0, 0, 1, 0, 0, 0 };
 
@@ -635,63 +602,8 @@ static void assert_inv(void)
 
 int main(void)
 {
-
-#if 0
-    test_add("0+0", zero, zero);
-    test_add("0+1", zero, one);
-    test_add("0+m", zero, mone);
-    test_add("0+w", zero, word);
-
-    test_add("1+0", one, zero);
-    test_add("1+1", one, one);
-    test_add("1+m", one, mone);
-    test_add("1+w", one, word);
-
-    test_add("m+0", mone, zero);
-    test_add("m+1", mone, one);
-    test_add("m+m", mone, mone);
-    test_add("m+w", mone, word);
-
-    test_add("w+0", word, zero);
-    test_add("w+1", word, one);
-    test_add("w+m", word, mone);
-    test_add("w+w", word, word);
-
-    printf("\n");
-
-    test_sub("0-0", zero, zero);
-    test_sub("0-1", zero, one);
-    test_sub("0-m", zero, mone);
-    test_sub("0-w", zero, word);
-
-    test_sub("1-0", one, zero);
-    test_sub("1-1", one, one);
-    test_sub("1-m", one, mone);
-    test_sub("1-w", one, word);
-
-    test_sub("m-0", mone, zero);
-    test_sub("m-1", mone, one);
-    test_sub("m-m", mone, mone);
-    test_sub("m-w", mone, word);
-
-    test_sub("w-0", word, zero);
-    test_sub("w-1", word, one);
-    test_sub("w-m", word, mone);
-    test_sub("w-w", word, word);
-#else
-    /* Just to keep the functions and variables used */
-    printf("constants\n");
+    /* Just to keep the function used */
     print_u256("p", p256_p, 0);
-    print_u256("n", p256_n, 0);
-
-    printf("u256\n");
-    test_add("w+m", word, mone);
-    test_sub("0-1", zero, one);
-
-    printf("m256\n");
-    test_madd("n+b", p256_p, p256_n, b128);
-    test_msub("w-1", p256_p, word, one);
-#endif
 
     assert_add(r, s, rps, 0u);
 
