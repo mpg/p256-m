@@ -77,7 +77,7 @@ static uint32_t u256_sub(uint32_t z[8],
     for (unsigned i = 0; i < 8; i++) {
         uint64_t diff = (uint64_t) x[i] - y[i] - carry;
         z[i] = (uint32_t) diff;
-        carry = - (uint32_t) (diff >> 32);
+        carry = -(uint32_t) (diff >> 32);
     }
 
     return carry;
@@ -114,8 +114,7 @@ static void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
  *
  * This is a helper for Montgomery multiplication.
  */
-static uint32_t u288_muladd(uint32_t z[9],
-                            uint32_t x, const uint32_t y[8])
+static uint32_t u288_muladd(uint32_t z[9], uint32_t x, const uint32_t y[8])
 {
     uint32_t carry = 0;
 
@@ -144,10 +143,10 @@ static uint32_t u288_muladd(uint32_t z[9],
  */
 static void u288_rshift32(uint32_t z[9], uint32_t c)
 {
-        for (unsigned i = 0; i < 8; i++) {
-            z[i] = z[i+1];
-        }
-        z[8] = c;
+    for (unsigned i = 0; i < 8; i++) {
+        z[i] = z[i + 1];
+    }
+    z[8] = c;
 }
 
 /**********************************************************************
@@ -171,11 +170,12 @@ static void u288_rshift32(uint32_t z[9], uint32_t c)
 /*
  * Primes associated to the curve, modulo which we'll compute
  */
-STATIC const uint32_t p256_p[8] = { /* the curve's p */
+STATIC const uint32_t p256_p[8] = {     /* the curve's p */
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
     0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
 };
-STATIC const uint32_t p256_n[8] = { /* the curve's n */
+
+STATIC const uint32_t p256_n[8] = {     /* the curve's n */
     0xFC632551, 0xF3B9CAC2, 0xA7179E84, 0xBCE6FAAD,
     0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
 };
@@ -190,22 +190,25 @@ STATIC const uint32_t p256_n[8] = { /* the curve's n */
  * This is a trick to allow selecting the proper value given m = p or n
  * by using m[6] as the index in this table (see values or p and n above).
  */
-static inline uint32_t m256_mont_idx(const uint32_t m[8]) {
-    return m[6]; /* conveniently happens to be 0 for n, 1 for p */
+static inline uint32_t m256_mont_idx(const uint32_t m[8])
+{
+    return m[6];        /* conveniently happens to be 0 for n, 1 for p */
 }
-static const uint32_t m256_mont_ni[2] = { /* negative inverses or n and p */
+
+static const uint32_t m256_mont_ni[2] = {       /* negative inverses or n and p */
     0xee00bc4f, /* -n^-1 mod 32 */
     0x00000001, /* -p^-1 mod 32 */
 };
-static const uint32_t m256_mont_R2[2][8] = { /* R^2 mod n and p, with R = 2^256 */
-    { /* 2^512 mod n */
-        0xbe79eea2, 0x83244c95, 0x49bd6fa6, 0x4699799c,
-        0x2b6bec59, 0x2845b239, 0xf3d95620, 0x66e12d94,
-    },
-    { /* 2^512 mod p */
-        0x00000003, 0x00000000, 0xffffffff, 0xfffffffb,
-        0xfffffffe, 0xffffffff, 0xfffffffd, 0x00000004,
-    },
+
+static const uint32_t m256_mont_R2[2][8] = {    /* R^2 mod n and p, with R = 2^256 */
+    {   /* 2^512 mod n */
+     0xbe79eea2, 0x83244c95, 0x49bd6fa6, 0x4699799c,
+     0x2b6bec59, 0x2845b239, 0xf3d95620, 0x66e12d94,
+      },
+    {   /* 2^512 mod p */
+     0x00000003, 0x00000000, 0xffffffff, 0xfffffffb,
+     0xfffffffe, 0xffffffff, 0xfffffffd, 0x00000004,
+      },
 };
 
 /*
@@ -284,9 +287,9 @@ STATIC void m256_mul(uint32_t z[8],
     }
 
     /* a = a > m ? a - m : a */
-    uint32_t carry_add = a[8]; // 0 or 1 since a < 2m, see HAC Note 14.37
+    uint32_t carry_add = a[8];  // 0 or 1 since a < 2m, see HAC Note 14.37
     uint32_t carry_sub = u256_sub(z, a, m);
-    uint32_t use_sub = carry_add | (1 - carry_sub); // see m256_add()
+    uint32_t use_sub = carry_add | (1 - carry_sub);     // see m256_add()
     u256_cmov(z, a, 1 - use_sub);
 }
 
@@ -330,7 +333,8 @@ STATIC void m256_done(uint32_t z[8], const uint32_t m[8])
  *
  * Note: as a memory area, z may overlap with x or y.
  */
-STATIC void m256_inv(uint32_t z[8], const uint32_t x[8], const uint32_t m[8])
+STATIC void m256_inv(uint32_t z[8], const uint32_t x[8],
+                     const uint32_t m[8])
 {
     /*
      * Use Fermat's little theorem to compute x^-1 as x^(m-2).
@@ -342,7 +346,7 @@ STATIC void m256_inv(uint32_t z[8], const uint32_t x[8], const uint32_t m[8])
      * branches are OK as the exponent is not a secret.
      */
     uint32_t bitval[8];
-    u256_cmov(bitval, x, 1); /* copy x before writing to z */
+    u256_cmov(bitval, x, 1);    /* copy x before writing to z */
 
     u256_set32(z, 1);
     m256_prep(z, m);
@@ -417,28 +421,32 @@ static const uint32_t r[8] = {
     0xdcd1d063, 0x7d3d0eb8, 0x9c4ecc3c, 0xd937cbcb,
     0x0a14613e, 0xf76db5ed, 0xec0db49c, 0x760cd745,
 };
+
 static const uint32_t s[8] = {
     0x514595c2, 0xc5e403b2, 0x5444fc98, 0xb3b1c6ed,
     0xaccbcfff, 0xdde65249, 0x120eb6d7, 0x17380bcf,
 };
+
 static const uint32_t rps[8] = {
     0x2e176625, 0x4321126b, 0xf093c8d5, 0x8ce992b8,
     0xb6e0313e, 0xd5540836, 0xfe1c6b74, 0x8d44e314,
 };
+
 static const uint32_t rms[8] = {
     0x8b8c3aa1, 0xb7590b06, 0x4809cfa3, 0x258604de,
     0x5d48913f, 0x198763a3, 0xd9fefdc5, 0x5ed4cb76,
 };
+
 static const uint32_t smr[8] = {
     0x7473c55f, 0x48a6f4f9, 0xb7f6305c, 0xda79fb21,
     0xa2b76ec0, 0xe6789c5c, 0x2601023a, 0xa12b3489,
 };
 
-static const uint32_t zero[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-static const uint32_t one[8] = {1, 0, 0, 0, 0, 0, 0, 0};
-static const uint32_t mone[8] = {-1u, -1u, -1u, -1u, -1u, -1u, -1u, -1u};
-static const uint32_t word[8] = {-1u, 0, 0, 0, 0, 0, 0, 0};
-static const uint32_t b128[8] = {0, 0, 0, 0, 1, 0, 0, 0};
+static const uint32_t zero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static const uint32_t one[8] = { 1, 0, 0, 0, 0, 0, 0, 0 };
+static const uint32_t mone[8] = { -1u, -1u, -1u, -1u, -1u, -1u, -1u, -1u };
+static const uint32_t word[8] = { -1u, 0, 0, 0, 0, 0, 0, 0 };
+static const uint32_t b128[8] = { 0, 0, 0, 0, 1, 0, 0, 0 };
 
 /* n + 2**32 - 1 mod p */
 static const uint32_t npwmp[8] = {
