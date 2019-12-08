@@ -5,7 +5,7 @@ runtest: $(TESTBIN)
 	./$(TESTBIN)
 
 $(TESTBIN): $(SRC)
-	clang -Weverything -O1 $< -o $@
+	clang -Weverything --std=c99 -O1 $< -o $@
 
 all: runtest
 	./sizes.sh
