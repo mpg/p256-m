@@ -27,7 +27,7 @@
  * in: x in [0, 2^32)
  * out: z = x
  */
-STATIC void u256_set32(uint32_t z[8], uint32_t x)
+static void u256_set32(uint32_t z[8], uint32_t x)
 {
     z[0] = x;
     for (unsigned i = 1; i < 8; i++) {
@@ -45,7 +45,7 @@ STATIC void u256_set32(uint32_t z[8], uint32_t x)
  *
  * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
-STATIC uint32_t u256_add(uint32_t z[8],
+static uint32_t u256_add(uint32_t z[8],
                          const uint32_t x[8], const uint32_t y[8])
 {
     uint32_t carry = 0;
@@ -69,7 +69,7 @@ STATIC uint32_t u256_add(uint32_t z[8],
  *
  * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
-STATIC uint32_t u256_sub(uint32_t z[8],
+static uint32_t u256_sub(uint32_t z[8],
                          const uint32_t x[8], const uint32_t y[8])
 {
     uint32_t carry = 0;
@@ -92,7 +92,7 @@ STATIC uint32_t u256_sub(uint32_t z[8],
  *
  * Note: as a memory area, z must be either equal to x, or not overlap.
  */
-STATIC void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
+static void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
 {
     const uint32_t x_mask = -c;
     for (unsigned i = 0; i < 8; i++) {
