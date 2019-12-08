@@ -107,7 +107,7 @@ static void u256_cmov(uint32_t z[8], const uint32_t x[8], uint32_t c)
  *     y in [0, 2^256)
  * out: 0 if x == y, unspecified non-zero otherwise
  */
-STATIC uint32_t u256_diff(const uint32_t x[8], const uint32_t y[8])
+static uint32_t u256_diff(const uint32_t x[8], const uint32_t y[8])
 {
     uint32_t diff = 0;
     for (unsigned i = 0; i < 8; i++) {
@@ -186,7 +186,7 @@ static void u288_rshift32(uint32_t z[9], uint32_t c)
 /*
  * Primes associated to the curve, modulo which we'll compute
  */
-STATIC const uint32_t p256_p[8] = {     /* the curve's p */
+static const uint32_t p256_p[8] = {     /* the curve's p */
     0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
     0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
 };
@@ -236,7 +236,7 @@ static const uint32_t m256_mont_R2[2][8] = {    /* R^2 mod n and p, with R = 2^2
  *
  * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
-STATIC void m256_add(uint32_t z[8],
+static void m256_add(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
                      const uint32_t m[8])
 {
@@ -259,7 +259,7 @@ STATIC void m256_add(uint32_t z[8],
  *
  * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
-STATIC void m256_sub(uint32_t z[8],
+static void m256_sub(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
                      const uint32_t m[8])
 {
@@ -281,7 +281,7 @@ STATIC void m256_sub(uint32_t z[8],
  *
  * Note: as a memory area, z may overlap with x or y.
  */
-STATIC void m256_mul(uint32_t z[8],
+static void m256_mul(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
                      const uint32_t m[8])
 {
@@ -316,7 +316,7 @@ STATIC void m256_mul(uint32_t z[8],
  *     m must be either p256_p or p256_n
  * out: z_out = z_in * 2^256 mod m, in [0, m)
  */
-STATIC void m256_prep(uint32_t z[8], const uint32_t m[8])
+static void m256_prep(uint32_t z[8], const uint32_t m[8])
 {
     const uint32_t *R2m = m256_mont_R2[m256_mont_idx(m)];
 
@@ -349,7 +349,7 @@ STATIC void m256_done(uint32_t z[8], const uint32_t m[8])
  *
  * Note: as a memory area, z may overlap with x or y.
  */
-STATIC void m256_inv(uint32_t z[8], const uint32_t x[8],
+static void m256_inv(uint32_t z[8], const uint32_t x[8],
                      const uint32_t m[8])
 {
     /*
@@ -408,7 +408,7 @@ STATIC void m256_inv(uint32_t z[8], const uint32_t x[8],
  *  y^2 = x^3 - 3*x + b
  * Compared to the standard, this is converted to the Montgomery domain.
  */
-STATIC const uint32_t p256_b[8] = { /* b * 2^256 mod p */
+static const uint32_t p256_b[8] = { /* b * 2^256 mod p */
     0x29c4bddf, 0xd89cdf62, 0x78843090, 0xacf005cd,
     0xf7212ed6, 0xe5a220ab, 0x04874834, 0xdc30061d,
 };
