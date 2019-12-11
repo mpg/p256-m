@@ -398,8 +398,15 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
  *
  * For background on jacobian coordinates, see for example [GECC] 3.2.2
  *
- * [GECC]: Guide to Elliptic Curve Cryptography - Hankerson, Menezes,
- * Vanstone; Springer, 2004.
+ * References:
+ * - [GECC]: Guide to Elliptic Curve Cryptography; Hankerson, Menezes,
+ *   Vanstone; Springer, 2004.
+ * - [CMO98]: Efficient Elliptic Curve Exponentiation Using Mixed Coordinates;
+ *   Cohen, Miyaji, Ono; Springer, ASIACRYPT 1998.
+ *   https://link.springer.com/content/pdf/10.1007/3-540-49649-1_6.pdf
+ * - [RCB15]: Complete addition formulas for prime order elliptic curves;
+ *   Renes, Costello, Batina; IACR e-print 2015-1060.
+ *   https://eprint.iacr.org/2015/1060.pdf
  *
  **********************************************************************/
 
@@ -468,6 +475,54 @@ STATIC void point_to_affine(uint32_t x[8], uint32_t y[8], uint32_t z[8])
 
     m256_mul(t, t, z, p256_p);  /* t = z^-3 */
     m256_mul(y, y, t, p256_p);  /* y = y * z^-3 */
+}
+
+/*
+ * Point doubling in jacobian coordinates (and Montgomery domain)
+ *
+ * in: (x:y:z), must be on the curve
+ * out: (t:s:u) = 2 * (x:y:z)
+ */
+STATIC void point_double(uint32_t t[8], uint32_t s[8], uint32_t u[8],
+                         const uint32_t x[8], const uint32_t y[8],
+                         const uint32_t z[8])
+{
+    /*
+     * This is formula 6 from [CMO98], cited as complete in [RCB15] (table 1).
+     */
+    uint32_t m[8];
+
+    /* m = 3 * x^2 + a * z^4 = 3 * (x + z^2) * (x - z^2) */
+    m256_mul(s, z, z, p256_p);
+    m256_add(t, x, s, p256_p);
+    m256_sub(u, x, s, p256_p);
+    m256_mul(s, t, u, p256_p);
+    m256_add(m, s, s, p256_p);
+    m256_add(m, m, s, p256_p);
+
+    /* s = 4 * x * y^2 */
+    m256_mul(t, y, y, p256_p);
+    m256_add(t, t, t, p256_p); /* t = 2 * y^2 (used for u below) */
+    m256_mul(s, x, t, p256_p);
+    m256_add(s, s, s, p256_p);
+
+    /* u = 8 * y^4 (not named in the paper, first term of y3) */
+    m256_mul(u, t, t, p256_p);
+    m256_add(u, u, u, p256_p);
+
+    /* x3 = t = m^2 - 2 * s */
+    m256_mul(t, m, m, p256_p);
+    m256_sub(t, t, s, p256_p);
+    m256_sub(t, t, s, p256_p);
+
+    /* y3 = -u + m * (s - t) */
+    m256_sub(s, s, t, p256_p);
+    m256_mul(s, s, m, p256_p);
+    m256_sub(s, s, u, p256_p);
+
+    /* z3 = 2 * y * z */
+    m256_mul(u, y, z, p256_p);
+    m256_add(u, u, u, p256_p);
 }
 
 /**********************************************************************
@@ -601,6 +656,16 @@ static const uint32_t jac_gy[8] = {
 static const uint32_t jac_gz[8] = {
     0x8b622f45, 0x7f8503c6, 0x00f250d0, 0xf5d756cc,
     0xfc84a8bf, 0x3486a9ed, 0xa1ba8ea7, 0x0a8b5909,
+};
+
+/* affine coordinates (not Montgomery) for 2 * G */
+static const uint32_t g2x[8] = {
+    0x47669978, 0xa60b48fc, 0x77f21b35, 0xc08969e2,
+    0x04b51ac3, 0x8a523803, 0x8d034f7e, 0x7cf27b18,
+};
+static const uint32_t g2y[8] = {
+    0x227873d1, 0x9e04b79d, 0x3ce98229, 0xba7dade6,
+    0x9f7430db, 0x293d9ac6, 0xdb8ed040, 0x07775510,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -768,6 +833,20 @@ static void assert_pt_affine(void)
     assert(memcmp(y, p256_gy, sizeof y) == 0);
 }
 
+static void assert_pt_double(void)
+{
+    uint32_t dx[8], dy[8], dz[8];
+
+    point_double(dx, dy, dz, jac_gx, jac_gy, jac_gz);
+
+    point_to_affine(dx, dy, dz);
+    m256_done(dx, p256_p);
+    m256_done(dy, p256_p);
+
+    assert(memcmp(dx, g2x, sizeof dx) == 0);
+    assert(memcmp(dy, g2y, sizeof dy) == 0);
+}
+
 int main(void)
 {
     /* Just to keep the function used */
@@ -789,5 +868,6 @@ int main(void)
     assert_pt_params();
     assert_pt_check();
     assert_pt_affine();
+    assert_pt_double();
 }
 #endif
