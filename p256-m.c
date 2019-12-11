@@ -525,6 +525,63 @@ STATIC void point_double(uint32_t t[8], uint32_t s[8], uint32_t u[8],
     m256_add(u, u, u, p256_p);
 }
 
+/*
+ * Point addition in jacobian-affine coordinates (and Montgomery domain)
+ *
+ * in: P = (x1:y1:z1), must be on the curve and not the origin
+ *     Q = (x2, y2), must be on the curve and not P or -P
+ * out: (x3:y3:z3) = P + Q
+ */
+STATIC void point_add(uint32_t x3[8], uint32_t y3[8], uint32_t z3[8],
+                      const uint32_t x1[8], const uint32_t y1[8],
+                      const uint32_t z1[8],
+                      const uint32_t x2[8], const uint32_t y2[8])
+{
+    /*
+     * This is formula 5 from [CMO98], with z2 == 1 substituted. We use
+     * intermediates with neutral names, and names from the paper in comments.
+     */
+    uint32_t t1[8], t2[8], t3[8];
+
+    /* u1 = x1 and s1 = y1 (no computations) */
+
+    /* t1 = u2 = x2 z1^2 */
+    m256_mul(t1, z1, z1, p256_p);
+    m256_mul(t2, t1, z1, p256_p);
+    m256_mul(t1, t1, x2, p256_p);
+
+    /* t2 = s2 = y2 z1^3 */
+    m256_mul(t2, t2, y2, p256_p);
+
+    /* t1 = h = u2 - u1 */
+    m256_sub(t1, t1, x1, p256_p); /* t1 = x2 * z1^2 - x1 */
+
+    /* t2 = r = s2 - s1 */
+    m256_sub(t2, t2, y1, p256_p);
+
+    /* z3 = z1 * h */
+    m256_mul(z3, z1, t1, p256_p);
+
+    /* t1 = h^3 */
+    m256_mul(t3, t1, t1, p256_p);
+    m256_mul(t1, t3, t1, p256_p);
+
+    /* t3 = x1 * h^2 */
+    m256_mul(t3, t3, x1, p256_p);
+
+    /* x3 = r^2 - 2 * x1 * h^2 - h^3 */
+    m256_mul(x3, t2, t2, p256_p);
+    m256_sub(x3, x3, t3, p256_p);
+    m256_sub(x3, x3, t3, p256_p);
+    m256_sub(x3, x3, t1, p256_p);
+
+    /* y3 = r * (x1 * h^2 - x3) - y1 h^3 */
+    m256_sub(t3, t3, x3, p256_p);
+    m256_mul(t3, t3, t2, p256_p);
+    m256_mul(t1, t1, y1, p256_p);
+    m256_sub(y3, t3, t1, p256_p);
+}
+
 /**********************************************************************
  *
  * Functions and data for testing and debugging
@@ -666,6 +723,16 @@ static const uint32_t g2x[8] = {
 static const uint32_t g2y[8] = {
     0x227873d1, 0x9e04b79d, 0x3ce98229, 0xba7dade6,
     0x9f7430db, 0x293d9ac6, 0xdb8ed040, 0x07775510,
+};
+
+/* affine coordinates (not Montgomery) for 3 * G */
+static const uint32_t g3x[8] = {
+    0xc6e7fd6c, 0xfb41661b, 0xefada985, 0xe6c6b721,
+    0x1d4bf165, 0xc8f7ef95, 0xa6330a44, 0x5ecbe4d1,
+};
+static const uint32_t g3y[8] = {
+    0xa27d5032, 0x9a79b127, 0x384fb83d, 0xd82ab036,
+    0x1a64a2ec, 0x374b06ce, 0x4998ff7e, 0x8734640c,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -847,6 +914,25 @@ static void assert_pt_double(void)
     assert(memcmp(dy, g2y, sizeof dy) == 0);
 }
 
+static void assert_pt_add(void)
+{
+    uint32_t tx[8], ty[8], tz[8], mg2x[8], mg2y[8];
+
+    u256_cmov(mg2x, g2x, 1);
+    u256_cmov(mg2y, g2y, 1);
+    m256_prep(mg2x, p256_p);
+    m256_prep(mg2y, p256_p);
+
+    point_add(tx, ty, tz, jac_gx, jac_gy, jac_gz, mg2x, mg2y);
+
+    point_to_affine(tx, ty, tz);
+    m256_done(tx, p256_p);
+    m256_done(ty, p256_p);
+
+    assert(memcmp(tx, g3x, sizeof tx) == 0);
+    assert(memcmp(ty, g3y, sizeof ty) == 0);
+}
+
 int main(void)
 {
     /* Just to keep the function used */
@@ -869,5 +955,6 @@ int main(void)
     assert_pt_check();
     assert_pt_affine();
     assert_pt_double();
+    assert_pt_add();
 }
 #endif
