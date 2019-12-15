@@ -62,11 +62,26 @@ s = 0x17380bcf120eb6d7dde65249accbcfffb3b1c6ed5444fc98c5e403b2514595c2
 # c_print("jac_gy", int(p256.gy * z**3 * Rp))
 # c_print("jac_gz", int(z * Rp))
 
-#g2 = 2 * p256.base_point()
+c_print("g1yn", int(-p256.base_point().y()))
+
+g2 = 2 * p256.base_point()
 #c_print("g2x", int(g2.x()))
 #c_print("g2y", int(g2.y()))
+c_print("g2yn", int(-g2.y()))
 
 g3 = 3 * p256.base_point()
-c_print("g3x", int(g3.x()))
-c_print("g3y", int(g3.y()))
+# c_print("g3x", int(g3.x()))
+# c_print("g3y", int(g3.y()))
+c_print("g3yn", int(-g3.y()))
 
+rg = r * p256.base_point()
+c_print("rgx", int(rg.x()))
+c_print("rgy", int(rg.y()))
+
+sg = s * p256.base_point()
+c_print("sgx", int(sg.x()))
+c_print("sgy", int(sg.y()))
+
+rsg = r * s * p256.base_point()
+c_print("rsgx", int(rsg.x()))
+c_print("rsgy", int(rsg.y()))

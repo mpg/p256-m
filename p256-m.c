@@ -396,7 +396,11 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
  * In either case, coordinates are integers modulo p256_p and
  * are always represented in the Montgomery domain.
  *
- * For background on jacobian coordinates, see for example [GECC] 3.2.2
+ * For background on jacobian coordinates, see for example [GECC] 3.2.2:
+ * - conversions go (x, y) -> (x:y:1) and (x:y:z) -> (x/z^2, y/z^3)
+ * - the curve equation becomes y^2 = x^3 - 3 x z^4 + b z^6
+ * - the origin (aka 0 aka point at infinity) is (x:y:0) with y^2 = x^3.
+ * - point negation goes -(x:y:z) = (x:-y:z)
  *
  * References:
  * - [GECC]: Guide to Elliptic Curve Cryptography; Hankerson, Menezes,
@@ -584,6 +588,94 @@ STATIC void point_add(uint32_t x3[8], uint32_t y3[8], uint32_t z3[8],
 
 /**********************************************************************
  *
+ * Scalar multiplication
+ *
+ **********************************************************************/
+
+/*
+ * Scalar multiplication
+ *
+ * in: P = (px, py), affine (Montgomery), must be on the curve
+ *     s in [1, n-1]
+ * out: R = s * P = (rx:ry:rz), jacobian coordinates (Montgomery).
+ */
+STATIC void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
+                        const uint32_t px[8], const uint32_t py[8],
+                        const uint32_t s[8])
+{
+    /*
+     * We use a signed binary ladder, see for example slides 10-14 of
+     * http://ecc2015.math.u-bordeaux1.fr/documents/hamburg.pdf but with
+     * implicit recoding, and a different loop initialisation to avoid feeding
+     * 0 to our addition formulas, as they don't support it.
+     */
+    uint32_t s_odd[8], py_neg[8], py_use[8];
+
+    /*
+     * Make s odd by replacing it with n - s if necessary.
+     *
+     * If s was odd, we'll have s_odd = s, and define P' = P.
+     * Otherwise, we'll have s_odd = n - s and define P' = -P.
+     *
+     * Either way, we can compute s * P as s_odd * P'.
+     */
+    u256_sub(s_odd, p256_n, s); /* no carry, result still in [1, n-1] */
+    uint32_t negate = ~s[0] & 1;
+    u256_cmov(s_odd, s, 1 - negate);
+
+    /* Compute py_neg = - py mod p (that's the y coordinate of -P) */
+    u256_set32(py_use, 0);
+    m256_sub(py_neg, py_use, py, p256_p);
+
+    /* Initialize R = P' = (x:(-1)^negate * y:1) */
+    u256_cmov(rx, px, 1);
+    u256_cmov(ry, py, 1);
+    u256_set32(rz, 1);
+    m256_prep(rz, p256_p);
+    u256_cmov(ry, py_neg, negate);
+
+    /*
+     * For any odd number s_odd = b255 ... b1 1, we have
+     *      s_odd = 2^255 + 2^254 sbit(b255) + ... + 2 sbit(b2) + sbit(b1)
+     * writing
+     *      sbit(b) = 2 * b - 1 = b ? 1 : 1
+     *
+     * Use that to compute s_odd * P' by repeating R = 2 * R +- P':
+     *      s_odd * P' = 2 * ( ... (2 * P' + sbit(b255) P') ... ) + sbit(b1) P'
+     *
+     * The loop invariant is that when beginning an iteration we have
+     *      R = s_i P'
+     * with
+     *      s_i = 2^(255-i) + 2^(254-i) sbit(b_255) + ...
+     * where the sum has 256 - i terms.
+     *
+     * When updating R we need to make sure the input to point_add() is
+     * neither 0 not +-P'. Since that input is 2 s_i P', it is sufficient to
+     * see that 1 < 2 s_i < n-1. The lower bound is obvious since s_i is a
+     * positive integer, and for the upper bound we distinguish three cases.
+     *
+     * If i > 1, then s_i < 2^254, so 2 s_i < 2^255 < n-1.
+     * Otherwise, i == 1 and we have 2 s_i = s_odd - * sbit(b1).
+     *      If s_odd <= n-4, then 2 s_1 <= n-3.
+     *      Otherwise, s_odd = n-2, and for this curve's value of n,
+     *      we have b1 == 1, so sbit(b1) = 1 and 2 s_1 <= n-3.
+     */
+    for (unsigned i = 255; i > 0; i--) {
+        uint32_t bit = (s_odd[i / 32] >> i % 32) & 1;
+
+        /* set (px, py_use) = sbit(bit) P' = sbit(bit) * (-1)^negate P' */
+        u256_cmov(py_use, py, bit ^ negate);
+        u256_cmov(py_use, py_neg, (1 - bit) ^ negate);
+
+        /* Update R = 2 * R +- P' */
+        uint32_t x[8], y[8], z[8];
+        point_double(x, y, z, rx, ry, rz);
+        point_add(rx, ry, rz, x, y, z, px, py_use);
+    }
+}
+
+/**********************************************************************
+ *
  * Functions and data for testing and debugging
  *
  **********************************************************************/
@@ -733,6 +825,46 @@ static const uint32_t g3x[8] = {
 static const uint32_t g3y[8] = {
     0xa27d5032, 0x9a79b127, 0x384fb83d, 0xd82ab036,
     0x1a64a2ec, 0x374b06ce, 0x4998ff7e, 0x8734640c,
+};
+
+/* affine (non-Montgomery) y coordinates for -G, -2G, -3G */
+static const uint32_t g1yn[8] = {
+    0xc840ae0a, 0x3449bf97, 0x94cea131, 0xd431cca9,
+    0x83f061e9, 0x711814b5, 0x01e58065, 0xb01cbd1c,
+};
+static const uint32_t g2yn[8] = {
+    0xdd878c2e, 0x61fb4862, 0xc3167dd6, 0x4582521a,
+    0x608bcf24, 0xd6c26539, 0x24712fc0, 0xf888aaee,
+};
+static const uint32_t g3yn[8] = {
+    0x5d82afcd, 0x65864ed8, 0xc7b047c2, 0x27d54fca,
+    0xe59b5d13, 0xc8b4f931, 0xb6670082, 0x78cb9bf2,
+};
+
+/* affine (non-Montgomery) coordinates for rG, sG, and rsG */
+static const uint32_t rgx[8] = {
+    0x2d7d8169, 0xa5fcd718, 0x9419df62, 0x206c7b0d,
+    0xa45f816d, 0x3513df65, 0x4527d237, 0x2494c867,
+};
+static const uint32_t rgy[8] = {
+    0x9a8acdf6, 0x431c11fb, 0x816684fa, 0x89511fbe,
+    0x6d78ef6a, 0x39feebbc, 0xb317baac, 0xe3537a5f,
+};
+static const uint32_t sgx[8] = {
+    0x3d7aefb9, 0xed941943, 0xc8fd42b5, 0x7fb27d58,
+    0xc385563d, 0xae5fd1e5, 0xd8b665c7, 0x91dd2c43,
+};
+static const uint32_t sgy[8] = {
+    0xed32ff2d, 0x2d348936, 0x1fae3cce, 0xb71bae36,
+    0xf7e483eb, 0x3fad9e82, 0xcf1094d0, 0x34e0eede,
+};
+static const uint32_t rsgx[8] = {
+    0x581428d1, 0xc785bafd, 0x98dfb0b4, 0x232c0874,
+    0xfad7f44b, 0x7de31996, 0x527f0fc5, 0x698fd765,
+};
+static const uint32_t rsgy[8] = {
+    0x638717a6, 0x22ca2482, 0x8b1e0f69, 0xab90be4b,
+    0x1aed141e, 0x562a441d, 0x61bcda5c, 0xb44b3f84,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -933,6 +1065,97 @@ static void assert_pt_add(void)
     assert(memcmp(ty, g3y, sizeof ty) == 0);
 }
 
+static void assert_scalar_mult(void)
+{
+    uint32_t x[8], y[8], z[8], k[8], xx[8], yy[8];
+
+    /* 1 * g */
+    u256_set32(k, 1);
+    scalar_mult(x, y, z, p256_gx, p256_gy, k);
+    point_to_affine(x, y, z);
+    assert(memcmp(x, p256_gx, sizeof x) == 0);
+    assert(memcmp(y, p256_gy, sizeof y) == 0);
+
+    /* 2 * g */
+    u256_set32(k, 2);
+    scalar_mult(x, y, z, p256_gx, p256_gy, k);
+    point_to_affine(x, y, z);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, g2x, sizeof x) == 0);
+    assert(memcmp(y, g2y, sizeof y) == 0);
+
+    /* 3 * g */
+    u256_set32(k, 3);
+    scalar_mult(x, y, z, p256_gx, p256_gy, k);
+    point_to_affine(x, y, z);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, g3x, sizeof x) == 0);
+    assert(memcmp(y, g3y, sizeof y) == 0);
+
+    /* (n-1) * g */
+    u256_sub(k, p256_n, one);
+    scalar_mult(x, y, z, p256_gx, p256_gy, k);
+    point_to_affine(x, y, z);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, gx_raw, sizeof x) == 0);
+    assert(memcmp(y, g1yn, sizeof y) == 0);
+
+    /* (n-2) * g */
+    u256_sub(k, k, one);
+    scalar_mult(x, y, z, p256_gx, p256_gy, k);
+    point_to_affine(x, y, z);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, g2x, sizeof x) == 0);
+    assert(memcmp(y, g2yn, sizeof y) == 0);
+
+    /* (n-3) * g */
+    u256_sub(k, k, one);
+    scalar_mult(x, y, z, p256_gx, p256_gy, k);
+    point_to_affine(x, y, z);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, g3x, sizeof x) == 0);
+    assert(memcmp(y, g3yn, sizeof y) == 0);
+
+    /* rG then s(rG) */
+    scalar_mult(x, y, z, p256_gx, p256_gy, r);
+    point_to_affine(x, y, z);
+    u256_cmov(xx, x, 1);
+    u256_cmov(yy, y, 1);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, rgx, sizeof x) == 0);
+    assert(memcmp(y, rgy, sizeof y) == 0);
+
+    scalar_mult(x, y, z, xx, yy, s);
+    point_to_affine(x, y, z);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, rsgx, sizeof x) == 0);
+    assert(memcmp(y, rsgy, sizeof y) == 0);
+
+    /* sG then r(sG) */
+    scalar_mult(x, y, z, p256_gx, p256_gy, s);
+    point_to_affine(x, y, z);
+    u256_cmov(xx, x, 1);
+    u256_cmov(yy, y, 1);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, sgx, sizeof x) == 0);
+    assert(memcmp(y, sgy, sizeof y) == 0);
+
+    scalar_mult(x, y, z, xx, yy, r);
+    point_to_affine(x, y, z);
+    m256_done(x, p256_p);
+    m256_done(y, p256_p);
+    assert(memcmp(x, rsgx, sizeof x) == 0);
+    assert(memcmp(y, rsgy, sizeof y) == 0);
+}
+
 int main(void)
 {
     /* Just to keep the function used */
@@ -956,5 +1179,7 @@ int main(void)
     assert_pt_affine();
     assert_pt_double();
     assert_pt_add();
+
+    assert_scalar_mult();
 }
 #endif
