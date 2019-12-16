@@ -529,15 +529,13 @@ STATIC void point_double(uint32_t x[8], uint32_t y[8], uint32_t z[8])
 }
 
 /*
- * Point addition in jacobian-affine coordinates (and Montgomery domain)
+ * In-place point addition in jacobian-affine coordinates (Montgomery domain)
  *
- * in: P = (x1:y1:z1), must be on the curve and not the origin
- *     Q = (x2, y2), must be on the curve and not P or -P
- * out: (x3:y3:z3) = P + Q
+ * in: P_in = (x1:y1:z1), must be on the curve and not the origin
+ *     Q = (x2, y2), must be on the curve and not P_in or -P_in
+ * out: P_out = (x3:y3:z3) = P_in + Q
  */
-STATIC void point_add(uint32_t x3[8], uint32_t y3[8], uint32_t z3[8],
-                      const uint32_t x1[8], const uint32_t y1[8],
-                      const uint32_t z1[8],
+STATIC void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
                       const uint32_t x2[8], const uint32_t y2[8])
 {
     /*
@@ -563,7 +561,7 @@ STATIC void point_add(uint32_t x3[8], uint32_t y3[8], uint32_t z3[8],
     m256_sub(t2, t2, y1, p256_p);
 
     /* z3 = z1 * h */
-    m256_mul(z3, z1, t1, p256_p);
+    m256_mul(z1, z1, t1, p256_p);
 
     /* t1 = h^3 */
     m256_mul(t3, t1, t1, p256_p);
@@ -573,16 +571,16 @@ STATIC void point_add(uint32_t x3[8], uint32_t y3[8], uint32_t z3[8],
     m256_mul(t3, t3, x1, p256_p);
 
     /* x3 = r^2 - 2 * x1 * h^2 - h^3 */
-    m256_mul(x3, t2, t2, p256_p);
-    m256_sub(x3, x3, t3, p256_p);
-    m256_sub(x3, x3, t3, p256_p);
-    m256_sub(x3, x3, t1, p256_p);
+    m256_mul(x1, t2, t2, p256_p);
+    m256_sub(x1, x1, t3, p256_p);
+    m256_sub(x1, x1, t3, p256_p);
+    m256_sub(x1, x1, t1, p256_p);
 
     /* y3 = r * (x1 * h^2 - x3) - y1 h^3 */
-    m256_sub(t3, t3, x3, p256_p);
+    m256_sub(t3, t3, x1, p256_p);
     m256_mul(t3, t3, t2, p256_p);
     m256_mul(t1, t1, y1, p256_p);
-    m256_sub(y3, t3, t1, p256_p);
+    m256_sub(y1, t3, t1, p256_p);
 }
 
 /**********************************************************************
@@ -668,7 +666,7 @@ STATIC void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
 
         /* Update R = 2 * R +- P' */
         point_double(rx, ry, rz);
-        point_add(rx, ry, rz, rx, ry, rz, px, py_use);
+        point_add(rx, ry, rz, px, py_use);
     }
 }
 
@@ -1057,7 +1055,11 @@ static void assert_pt_add(void)
     m256_prep(mg2x, p256_p);
     m256_prep(mg2y, p256_p);
 
-    point_add(tx, ty, tz, jac_gx, jac_gy, jac_gz, mg2x, mg2y);
+    u256_cmov(tx, jac_gx, 1);
+    u256_cmov(ty, jac_gy, 1);
+    u256_cmov(tz, jac_gz, 1);
+
+    point_add(tx, ty, tz, mg2x, mg2y);
 
     point_to_affine(tx, ty, tz);
     m256_done(tx, p256_p);
