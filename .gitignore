@@ -3,3 +3,5 @@ test
 *.s
 *.dump
 *.sizes
+*.su
+*.dfinish

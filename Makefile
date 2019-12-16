@@ -9,8 +9,9 @@ $(TESTBIN): $(SRC)
 
 all: runtest
 	./sizes.sh
+	./stack.sh | sed -n 's/^..p256-m.c *//p' | head
 
 clean:
-	rm -f $(TESTBIN) *.s *.o *.dump *.sizes
+	rm -f $(TESTBIN) *.s *.o *.dump *.sizes *.su *.dfinish
 
 .PHONY: runtest clean all

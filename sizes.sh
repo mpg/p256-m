@@ -16,6 +16,8 @@ clang() {
         -Oz $CFLAGS_COMMON "$@"
 }
 
+OBJECTS=''
+
 for CC in gcc clang; do
     for CPU in m0; do
         NAME="${CC}-${CPU}"
@@ -23,7 +25,8 @@ for CC in gcc clang; do
         $CC -mcpu=cortex-$CPU -c -o ${NAME}.o
         arm-none-eabi-objdump -d ${NAME}.o > ${NAME}.dump
         nm --radix=d --size-sort ${NAME}.o > ${NAME}.sizes
+        OBJECTS="$OBJECTS ${NAME}.o"
     done
 done
 
-arm-none-eabi-size *.o
+arm-none-eabi-size $OBJECTS
