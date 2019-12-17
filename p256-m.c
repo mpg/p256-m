@@ -487,7 +487,7 @@ STATIC void point_to_affine(uint32_t x[8], uint32_t y[8], uint32_t z[8])
  * in: P_in = (x:y:z), must be on the curve
  * out: (x:y:z) = P_out = 2 * P_in
  */
-STATIC void point_double(uint32_t x[8], uint32_t y[8], uint32_t z[8])
+static void point_double(uint32_t x[8], uint32_t y[8], uint32_t z[8])
 {
     /*
      * This is formula 6 from [CMO98], cited as complete in [RCB15] (table 1).
