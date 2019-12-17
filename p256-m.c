@@ -339,6 +339,20 @@ STATIC void m256_done(uint32_t z[8], const uint32_t m[8])
 }
 
 /*
+ * Set to 32-bit value
+ *
+ * in: x in [0, 2^32)
+ *     m must be either p256_p or p256_n
+ * out: z = x * 2^256 mod m, in [0, m)
+ * That is, z is set to the image of x in the Montgomery domain.
+ */
+static void m256_set32(uint32_t z[8], uint32_t x, const uint32_t m[8])
+{
+    u256_set32(z, x);
+    m256_prep(z, m);
+}
+
+/*
  * Modular inversion in Montgomery form
  *
  * in: x in [0, m)
@@ -364,8 +378,7 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
     uint32_t bitval[8];
     u256_cmov(bitval, x, 1);    /* copy x before writing to z */
 
-    u256_set32(z, 1);
-    m256_prep(z, m);
+    m256_set32(z, 1, m);
 
     unsigned i = 0;
     uint32_t limb = m[i] - 2;
@@ -627,8 +640,7 @@ STATIC void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
     /* Initialize R = P' = (x:(-1)^negate * y:1) */
     u256_cmov(rx, px, 1);
     u256_cmov(ry, py, 1);
-    u256_set32(rz, 1);
-    m256_prep(rz, p256_p);
+    m256_set32(rz, 1, p256_p);
     u256_cmov(ry, py_neg, negate);
 
     /*
