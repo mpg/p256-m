@@ -62,26 +62,39 @@ s = 0x17380bcf120eb6d7dde65249accbcfffb3b1c6ed5444fc98c5e403b2514595c2
 # c_print("jac_gy", int(p256.gy * z**3 * Rp))
 # c_print("jac_gz", int(z * Rp))
 
-c_print("g1yn", int(-p256.base_point().y()))
+# c_print("g1yn", int(-p256.base_point().y()))
 
-g2 = 2 * p256.base_point()
-#c_print("g2x", int(g2.x()))
-#c_print("g2y", int(g2.y()))
-c_print("g2yn", int(-g2.y()))
+# g2 = 2 * p256.base_point()
+# c_print("g2x", int(g2.x()))
+# c_print("g2y", int(g2.y()))
+# c_print("g2yn", int(-g2.y()))
 
-g3 = 3 * p256.base_point()
+# g3 = 3 * p256.base_point()
 # c_print("g3x", int(g3.x()))
 # c_print("g3y", int(g3.y()))
-c_print("g3yn", int(-g3.y()))
+# c_print("g3yn", int(-g3.y()))
 
-rg = r * p256.base_point()
-c_print("rgx", int(rg.x()))
-c_print("rgy", int(rg.y()))
+# rg = r * p256.base_point()
+# c_print("rgx", int(rg.x()))
+# c_print("rgy", int(rg.y()))
 
-sg = s * p256.base_point()
-c_print("sgx", int(sg.x()))
-c_print("sgy", int(sg.y()))
+# sg = s * p256.base_point()
+# c_print("sgx", int(sg.x()))
+# c_print("sgy", int(sg.y()))
 
-rsg = r * s * p256.base_point()
-c_print("rsgx", int(rsg.x()))
-c_print("rsgy", int(rsg.y()))
+# rsg = r * s * p256.base_point()
+# c_print("rsgx", int(rsg.x()))
+# c_print("rsgy", int(rsg.y()))
+
+
+def c_bytes(name, val):
+    array = name + '[32]'
+    print('static const uint8_t', array, '= {', end='')
+    for i in range(32):
+        sep = '\n    ' if i % 8 == 0 else ' '
+        limb = (val // 256**(31-i)) % 256
+        print(sep + '0x' + format(limb, '02x') + ',', end='')
+    print('\n};')
+
+
+c_bytes("rbytes", r);

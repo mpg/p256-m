@@ -165,6 +165,41 @@ static void u288_rshift32(uint32_t z[9], uint32_t c)
     z[8] = c;
 }
 
+/*
+ * 256-bit import from big-endian bytes
+ *
+ * in: p = p0, ..., p31
+ * out: z = p0 * 2^248 + p1 * 2^240 + ... + p30 * 2^8 + p31
+ */
+STATIC void u256_from_bytes(uint32_t z[8], const uint8_t p[32])
+{
+    for (unsigned i = 0; i < 8; i++) {
+        unsigned j = 4 * (7 - i);
+        z[i] = ((uint32_t) p[j + 0] << 24) |
+               ((uint32_t) p[j + 1] << 16) |
+               ((uint32_t) p[j + 2] <<  8) |
+               ((uint32_t) p[j + 3] <<  0);
+    }
+}
+
+/*
+ * 256-bit export to big-endian bytes
+ *
+ * in: z in [0, 2^256)
+ * out: p = p0, ..., p31 such that
+ *      z = p0 * 2^248 + p1 * 2^240 + ... + p30 * 2^8 + p31
+ */
+STATIC void u256_to_bytes(uint8_t p[32], const uint32_t z[8])
+{
+    for (unsigned i = 0; i < 8; i++) {
+        unsigned j = 4 * (7 - i);
+        p[j + 0] = (uint8_t) (z[i] >> 24);
+        p[j + 1] = (uint8_t) (z[i] >> 16);
+        p[j + 2] = (uint8_t) (z[i] >>  8);
+        p[j + 3] = (uint8_t) (z[i] >>  0);
+    }
+}
+
 /**********************************************************************
  *
  * Operations modulo a 256-bit prime m
@@ -875,6 +910,14 @@ static const uint32_t rsgy[8] = {
     0x1aed141e, 0x562a441d, 0x61bcda5c, 0xb44b3f84,
 };
 
+/* r as bytes, big-endian */
+static const uint8_t rbytes[32] = {
+    0x76, 0x0c, 0xd7, 0x45, 0xec, 0x0d, 0xb4, 0x9c,
+    0xf7, 0x6d, 0xb5, 0xed, 0x0a, 0x14, 0x61, 0x3e,
+    0xd9, 0x37, 0xcb, 0xcb, 0x9c, 0x4e, 0xcc, 0x3c,
+    0x7d, 0x3d, 0x0e, 0xb8, 0xdc, 0xd1, 0xd0, 0x63,
+};
+
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
                        const uint32_t z[8], uint32_t c)
 {
@@ -901,6 +944,17 @@ static void assert_cmov()
     assert(memcmp(z, r, sizeof z) == 0);
     u256_cmov(z, s, 1u);
     assert(memcmp(z, s, sizeof z) == 0);
+}
+
+static void assert_ubytes(void)
+{
+    uint32_t z[8];
+    u256_from_bytes(z, rbytes);
+    assert(memcmp(z, r, sizeof z) == 0);
+
+    uint8_t p[32];
+    u256_to_bytes(p, r);
+    assert(memcmp(p, rbytes, sizeof p) == 0);
 }
 
 static void assert_madd()
@@ -1177,25 +1231,28 @@ int main(void)
     /* Just to keep the function used */
     print_u256("p", p256_p, 0);
 
+    /* u256 */
     assert_add(r, s, rps, 0u);
-
     assert_sub(r, s, rms, 0u);
     assert_sub(s, r, smr, 1u);
-
     assert_cmov();
+    assert_ubytes();
 
+    /* m256 */
     assert_madd();
     assert_msub();
     assert_mmul();
     assert_prep_mul_done();
     assert_inv();
 
+    /* point */
     assert_pt_params();
     assert_pt_check();
     assert_pt_affine();
     assert_pt_double();
     assert_pt_add();
 
+    /* scalar */
     assert_scalar_mult();
 }
 #endif
