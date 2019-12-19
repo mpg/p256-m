@@ -710,7 +710,7 @@ STATIC void point_to_bytes(uint8_t p[64],
 
 /**********************************************************************
  *
- * Scalar multiplication
+ * Scalar multiplication and other scalar-related operations
  *
  **********************************************************************/
 
@@ -792,6 +792,30 @@ STATIC void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
         point_double(rx, ry, rz);
         point_add(rx, ry, rz, px, py_use);
     }
+}
+
+/*
+ * Scalar import from big-endian bytes
+ *
+ * in: p = p0, ..., p31
+ * out: s = p0 * 2^248 + p1 * 2^240 + ... + p30 * 2^8 + p31
+ *      return 0 if s in [1, n-1],
+ *            -1 otherwise.
+ */
+STATIC int scalar_from_bytes(uint32_t s[8], const uint8_t p[32])
+{
+    u256_from_bytes(s, p);
+
+    uint32_t r[8];
+    uint32_t lt_n = u256_sub(r, s, p256_n);
+
+    u256_set32(r, 1);
+    uint32_t lt_1 = u256_sub(r, s, r);
+
+    if (lt_n && !lt_1)
+        return 0;
+
+    return -1;
 }
 
 /**********************************************************************
@@ -1390,6 +1414,29 @@ static void assert_scalar_mult(void)
     assert(memcmp(y, rsgy, sizeof y) == 0);
 }
 
+static void assert_sbytes(void)
+{
+    uint32_t z[8];
+
+    uint8_t p[32] = { 0 };
+    assert(scalar_from_bytes(z, p) == -1);
+
+    p[31] = 1;
+    assert(scalar_from_bytes(z, p) == 0);
+    assert(memcmp(z, one, sizeof z) == 0);
+
+    u256_cmov(z, p256_n, 1);
+    u256_to_bytes(p, z);
+    assert(scalar_from_bytes(z, p) == -1);
+
+    u256_sub(z, p256_n, one);
+    u256_to_bytes(p, z);
+    assert(scalar_from_bytes(z, p) == 0);
+
+    assert(scalar_from_bytes(z, rbytes) == 0);
+    assert(memcmp(z, r, sizeof z) == 0);
+}
+
 int main(void)
 {
     /* Just to keep the function used */
@@ -1420,5 +1467,6 @@ int main(void)
 
     /* scalar */
     assert_scalar_mult();
+    assert_sbytes();
 }
 #endif
