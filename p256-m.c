@@ -1,9 +1,10 @@
-#include <stdint.h>
+#include "p256-m.h"
 
 #if !defined(NO_MAIN)
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 #endif
 
 #if defined(NO_MAIN)
@@ -1437,10 +1438,97 @@ static void assert_sbytes(void)
     assert(memcmp(z, r, sizeof z) == 0);
 }
 
+/*
+ * RNG for testing - may optionally return fixed bytes at the beginning
+ */
+static uint8_t fixed[64];
+static unsigned nb_fixed, nb_drawn;
+static int fixed_ret;
+
+static void fix_rng(const uint8_t *bytes, unsigned nb_bytes, int retval)
+{
+    assert(nb_bytes <= sizeof fixed);
+    memcpy(fixed, bytes, nb_bytes);
+    nb_fixed = nb_bytes;
+    nb_drawn = 0;
+    fixed_ret = retval;
+}
+
+static void unfix_rng(void)
+{
+    nb_fixed = 0;
+    nb_drawn = 0;
+    fixed_ret = 0;
+}
+
+int p256_generate_random(uint8_t *output, unsigned output_size)
+{
+    unsigned output_offset = 0;
+
+    while (output_offset < output_size && nb_drawn < nb_fixed) {
+        output[output_offset++] = fixed[nb_drawn++];
+    }
+
+    while (output_offset < output_size) {
+        output[output_offset++] = (uint8_t) rand();
+        nb_drawn++;
+    }
+
+    return fixed_ret;
+}
+
+static void printout(char *name, uint8_t *p, unsigned len,
+                     unsigned drawn, int ret)
+{
+    printf("%s: ", name);
+    for (unsigned i = 0; i < len; i++)
+        printf("%02x", p[i]);
+    printf(" (%d, %d)\n", drawn, ret);
+}
+
+static void assert_rng_for_tests(void)
+{
+    uint8_t out[80], fix[64];
+    int ret;
+
+    for (uint8_t i = 0; i < 64; i++)
+        fix[i] = i;
+
+    ret = p256_generate_random(out, 80);
+    printout("rnd", out, 32, nb_drawn, ret);
+    assert(ret == 0);
+
+    fix_rng(fix, 32, -1);
+    ret = p256_generate_random(out, 80);
+    //printout("f32", out, 80, nb_drawn, ret);
+    assert(memcmp(fix, out, 32) == 0);
+    assert(ret = -1);
+
+    unfix_rng();
+    ret = p256_generate_random(out, 80);
+    //printout("rnd", out, 80, nb_drawn, ret);
+    assert(ret == 0);
+
+    fix_rng(fix, 64, 0);
+    ret = p256_generate_random(out, 32);
+    ret = p256_generate_random(out + 32, 32);
+    ret = p256_generate_random(out + 64, 16);
+    //printout("f64", out, 80, nb_drawn, ret);
+    assert(memcmp(fix, out, 32) == 0);
+
+    unfix_rng();
+    ret = p256_generate_random(out, 80);
+    //printout("rnd", out, 80, nb_drawn, ret);
+    assert(ret == 0);
+}
+
 int main(void)
 {
     /* Just to keep the function used */
     print_u256("p", p256_p, 0);
+
+    /* testing the test RNG */
+    assert_rng_for_tests();
 
     /* u256 */
     assert_add(r, s, rps, 0u);
