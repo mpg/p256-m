@@ -74,33 +74,39 @@ s = 0x17380bcf120eb6d7dde65249accbcfffb3b1c6ed5444fc98c5e403b2514595c2
 # c_print("g3y", int(g3.y()))
 # c_print("g3yn", int(-g3.y()))
 
-# rg = r * p256.base_point()
-# c_print("rgx", int(rg.x()))
-# c_print("rgy", int(rg.y()))
-
-# sg = s * p256.base_point()
-# c_print("sgx", int(sg.x()))
-# c_print("sgy", int(sg.y()))
-
-# rsg = r * s * p256.base_point()
-# c_print("rsgx", int(rsg.x()))
-# c_print("rsgy", int(rsg.y()))
-
-
-def c_bytes(name, val):
-    array = name + '[32]'
+def c_bytes(name, val, n):
+    array = name + '[' + str(n) + ']'
     print('static const uint8_t', array, '= {', end='')
-    for i in range(32):
+    for i in range(n):
         sep = '\n    ' if i % 8 == 0 else ' '
-        limb = (val // 256**(31-i)) % 256
+        limb = (val // 256**(n-1-i)) % 256
         print(sep + '0x' + format(limb, '02x') + ',', end='')
     print('\n};')
 
 
-#c_bytes("rbytes", r);
+def c_point(name, p):
+    val = 2**256 * int(p.x()) + int(p.y())
+    c_bytes(name, val, 64)
+
+# c_bytes("rbytes", r, 32);
+c_bytes("sbytes", s, 32);
 
 #c_print("rmontp", r * 2**256 % p256.p)
 #c_print("rmontn", r * 2**256 % p256.n)
 
-c_bytes('gx', int(p256.base_point().x()))
-c_bytes('gy', int(p256.base_point().y()))
+# c_point('gbytes', p256.base_point())
+
+rg = r * p256.base_point()
+# c_print("rgx", int(rg.x()))
+# c_print("rgy", int(rg.y()))
+c_point("rgb", rg)
+
+sg = s * p256.base_point()
+# c_print("sgx", int(sg.x()))
+# c_print("sgy", int(sg.y()))
+c_point("sgb", sg)
+
+rsg = r * s * p256.base_point()
+# c_print("rsgx", int(rsg.x()))
+# c_print("rsgy", int(rsg.y()))
+c_point("rsgb", rsg)
