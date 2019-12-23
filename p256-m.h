@@ -14,3 +14,9 @@ extern int p256_generate_random(uint8_t * output, unsigned output_size);
  * ECDH generate pair
  */
 int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64]);
+
+/*
+ * ECDH compute shared secret
+ */
+int p256_ecdh_shared_secret(uint8_t secret[32],
+                            const uint8_t priv[32], const uint8_t pub[64]);

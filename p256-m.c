@@ -855,6 +855,30 @@ int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64])
     return 0;
 }
 
+/*
+ * ECDH compute shared secret
+ */
+int p256_ecdh_shared_secret(uint8_t secret[32],
+                            const uint8_t priv[32], const uint8_t peer[64])
+{
+    uint32_t s[8], px[8], py[8], x[8], y[8], z[8];
+    int ret;
+
+    ret = scalar_from_bytes(s, priv);
+    if (ret != 0)
+        return ret;
+
+    ret = point_from_bytes(px, py, peer);
+    if (ret != 0)
+        return ret;
+
+    scalar_mult(x, y, z, px, py, s);
+    point_to_affine(x, y, z);
+
+    m256_to_bytes(secret, x, p256_p);
+    return 0;
+}
+
 /**********************************************************************
  *
  * Functions and data for testing and debugging
@@ -1107,18 +1131,12 @@ static const uint8_t sgb[64] = {
     0xb7, 0x1b, 0xae, 0x36, 0x1f, 0xae, 0x3c, 0xce,
     0x2d, 0x34, 0x89, 0x36, 0xed, 0x32, 0xff, 0x2d,
 };
-#if 0
-static const uint8_t rsgb[64] = {
+static const uint8_t rsgxb[32] = {
     0x69, 0x8f, 0xd7, 0x65, 0x52, 0x7f, 0x0f, 0xc5,
     0x7d, 0xe3, 0x19, 0x96, 0xfa, 0xd7, 0xf4, 0x4b,
     0x23, 0x2c, 0x08, 0x74, 0x98, 0xdf, 0xb0, 0xb4,
     0xc7, 0x85, 0xba, 0xfd, 0x58, 0x14, 0x28, 0xd1,
-    0xb4, 0x4b, 0x3f, 0x84, 0x61, 0xbc, 0xda, 0x5c,
-    0x56, 0x2a, 0x44, 0x1d, 0x1a, 0xed, 0x14, 0x1e,
-    0xab, 0x90, 0xbe, 0x4b, 0x8b, 0x1e, 0x0f, 0x69,
-    0x22, 0xca, 0x24, 0x82, 0x63, 0x87, 0x17, 0xa6,
 };
-#endif
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
                        const uint32_t z[8], uint32_t c)
@@ -1638,6 +1656,25 @@ static void assert_ecdh(void)
     ret = p256_ecdh_gen_pair(priv, pub);
     assert(ret == 0);
     assert(nb_drawn == 96);
+
+    /* shared secret - known values */
+    uint8_t secret[32];
+    ret = p256_ecdh_shared_secret(secret, rbytes, sgb);
+    assert(ret == 0);
+    assert(memcmp(secret, rsgxb, sizeof secret) == 0);
+
+    ret = p256_ecdh_shared_secret(secret, sbytes, rgb);
+    assert(ret == 0);
+    assert(memcmp(secret, rsgxb, sizeof secret) == 0);
+
+    /* shared secret - error conditions */
+    u256_to_bytes(priv, p256_n);
+    ret = p256_ecdh_shared_secret(secret, priv, sgb);
+    assert(ret != 0);
+
+    u256_to_bytes(pub, p256_p);
+    ret = p256_ecdh_shared_secret(secret, rbytes, pub);
+    assert(ret != 0);
 }
 
 int main(void)
