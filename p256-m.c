@@ -671,6 +671,43 @@ STATIC void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
     m256_sub(y1, t3, t1, p256_p);
 }
 
+/*
+ * Import curve point from bytes
+ *
+ * in: p = (x, y) concatenated, fixed-width 256-bit big-endian integers
+ * out: x, y in Mongomery domain
+ *      return 0 if x and y are both in [0, p) and (x, y) is on the curve,
+ *             unspecified non-zero otherwise.
+ *      x and y are unspecified and must be discarded if returning non-zero.
+ */
+STATIC int point_from_bytes(uint32_t x[8], uint32_t y[8], const uint8_t p[64])
+{
+    int ret;
+
+    ret = m256_from_bytes(x, p, p256_p);
+    if (ret != 0)
+        return ret;
+
+    ret = m256_from_bytes(y, p + 32, p256_p);
+    if (ret != 0)
+        return ret;
+
+    return (int) point_check(x, y);
+}
+
+/*
+ * Export curve point to bytes
+ *
+ * in: x, y affine coordinates of a point (Montgomery domain)
+ * out: p = (x, y) concatenated, fixed-width 256-bit big-endian integers
+ */
+STATIC void point_to_bytes(uint8_t p[64],
+                           const uint32_t x[8], const uint32_t y[8])
+{
+    m256_to_bytes(p,        x, p256_p);
+    m256_to_bytes(p + 32,   y, p256_p);
+}
+
 /**********************************************************************
  *
  * Scalar multiplication
@@ -968,6 +1005,20 @@ static const uint8_t rbytes[32] = {
     0x7d, 0x3d, 0x0e, 0xb8, 0xdc, 0xd1, 0xd0, 0x63,
 };
 
+/* the curve's base point as bytes */
+static const uint8_t gbytes[64] = {
+    /* x */
+    0x6b, 0x17, 0xd1, 0xf2, 0xe1, 0x2c, 0x42, 0x47,
+    0xf8, 0xbc, 0xe6, 0xe5, 0x63, 0xa4, 0x40, 0xf2,
+    0x77, 0x03, 0x7d, 0x81, 0x2d, 0xeb, 0x33, 0xa0,
+    0xf4, 0xa1, 0x39, 0x45, 0xd8, 0x98, 0xc2, 0x96,
+    /* y */
+    0x4f, 0xe3, 0x42, 0xe2, 0xfe, 0x1a, 0x7f, 0x9b,
+    0x8e, 0xe7, 0xeb, 0x4a, 0x7c, 0x0f, 0x9e, 0x16,
+    0x2b, 0xce, 0x33, 0x57, 0x6b, 0x31, 0x5e, 0xce,
+    0xcb, 0xb6, 0x40, 0x68, 0x37, 0xbf, 0x51, 0xf5,
+};
+
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
                        const uint32_t z[8], uint32_t c)
 {
@@ -1217,6 +1268,37 @@ static void assert_pt_add(void)
     assert(memcmp(ty, g3y, sizeof ty) == 0);
 }
 
+static void assert_pt_bytes(void)
+{
+    uint8_t p[64];
+    uint32_t x[8], y[8];
+    int ret;
+
+    /* valid */
+    ret = point_from_bytes(x, y, gbytes);
+    assert(ret == 0);
+    assert(memcmp(x, p256_gx, sizeof x) == 0);
+    assert(memcmp(y, p256_gy, sizeof y) == 0);
+
+    point_to_bytes(p, x, y);
+    assert(memcmp(p, gbytes, sizeof p) == 0);
+
+    /* invalid: x or y too big, (x, y) not on curve */
+    u256_to_bytes(p, p256_p);
+    ret = point_from_bytes(x, y, p);
+    assert(ret != 0);
+
+    u256_to_bytes(p, one);
+    u256_to_bytes(p + 32, p256_p);
+    ret = point_from_bytes(x, y, p);
+    assert(ret != 0);
+
+    u256_to_bytes(p, one);
+    u256_to_bytes(p + 32, one);
+    ret = point_from_bytes(x, y, p);
+    assert(ret != 0);
+}
+
 static void assert_scalar_mult(void)
 {
     uint32_t x[8], y[8], z[8], k[8], xx[8], yy[8];
@@ -1334,6 +1416,7 @@ int main(void)
     assert_pt_affine();
     assert_pt_double();
     assert_pt_add();
+    assert_pt_bytes();
 
     /* scalar */
     assert_scalar_mult();

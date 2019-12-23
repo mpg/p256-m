@@ -99,5 +99,8 @@ def c_bytes(name, val):
 
 #c_bytes("rbytes", r);
 
-c_print("rmontp", r * 2**256 % p256.p)
-c_print("rmontn", r * 2**256 % p256.n)
+#c_print("rmontp", r * 2**256 % p256.p)
+#c_print("rmontn", r * 2**256 % p256.n)
+
+c_bytes('gx', int(p256.base_point().x()))
+c_bytes('gy', int(p256.base_point().y()))
