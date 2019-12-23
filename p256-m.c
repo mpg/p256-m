@@ -434,6 +434,46 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
     }
 }
 
+/*
+ * Import modular integer from bytes to Montgomery domain
+ *
+ * in: p = p0, ..., p32
+ *     m must be either p256_p or p256_n
+ * out: z = (p0 * 2^248 + ... + p31) * 2^256 mod m, in [0, m)
+ *      return 0 if the number was already in [0, m), or -1.
+ *      z may be incorrect and must be discared when -1 is returned.
+ */
+STATIC int m256_from_bytes(uint32_t z[8],
+                           const uint8_t p[32], const uint32_t m[8])
+{
+    u256_from_bytes(z, p);
+
+    uint32_t t[8];
+    uint32_t lt_m = u256_sub(t, z, m);
+    if (lt_m != 1)
+        return -1;
+
+    m256_prep(z, m);
+    return 0;
+}
+
+/*
+ * Export modular integer from Montgomery domain to bytes
+ *
+ * in: z in [0, 2^256)
+ * out: p = p0, ..., p31 such that
+ *      z = (p0 * 2^248 + ... + p31) * 2^256 mod m
+ */
+STATIC void m256_to_bytes(uint8_t p[32],
+                          const uint32_t z[8], const uint32_t m[8])
+{
+    uint32_t zi[8];
+    u256_cmov(zi, z, 1);
+    m256_done(zi, m);
+
+    u256_to_bytes(p, zi);
+}
+
 /**********************************************************************
  *
  * Operations on curve points
@@ -786,6 +826,16 @@ static const uint32_t pm1[8] = {
     0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
 };
 
+/* r * 2^256 mod p and mod n */
+static const uint32_t rmontp[8] = {
+    0x93474788, 0xb5ef37e6, 0x1bfe5637, 0xedea599f,
+    0xd58607fe, 0xc77d1451, 0x4da1a333, 0xc7efa702,
+};
+static const uint32_t rmontn[8] = {
+    0x4f81c97b, 0xb371a1c3, 0x45711856, 0x5e77eeb5,
+    0x5b9517c0, 0x2fbb3648, 0xda55d090, 0xafbeb442,
+};
+
 /* r * s / 2^256 mod p */
 static const uint32_t rsRip[8] = {
     0x82f52d8b, 0xa771a352, 0x262dcb9c, 0x523cbab8,
@@ -1054,6 +1104,38 @@ static void assert_inv(void)
     assert(memcmp(z, rin, sizeof z) == 0);
 }
 
+static void assert_mbytes()
+{
+    int ret;
+    uint32_t z[8];
+    uint8_t p[32];
+
+    /* mod p */
+    ret = m256_from_bytes(z, rbytes, p256_p);
+    assert(ret == 0);
+    assert(memcmp(z, rmontp, sizeof z) == 0);
+
+    m256_to_bytes(p, z, p256_p);
+    assert(memcmp(p, rbytes, sizeof p) == 0);
+
+    /* mod n */
+    ret = m256_from_bytes(z, rbytes, p256_n);
+    assert(ret == 0);
+    assert(memcmp(z, rmontn, sizeof z) == 0);
+
+    m256_to_bytes(p, z, p256_n);
+    assert(memcmp(p, rbytes, sizeof p) == 0);
+
+    /* too large by one, mod p and n */
+    u256_to_bytes(p, p256_p);
+    ret = m256_from_bytes(z, p, p256_p);
+    assert(ret == -1);
+
+    u256_to_bytes(p, p256_n);
+    ret = m256_from_bytes(z, p, p256_n);
+    assert(ret == -1);
+}
+
 static void assert_pt_params(void)
 {
     uint32_t z[8];
@@ -1244,6 +1326,7 @@ int main(void)
     assert_mmul();
     assert_prep_mul_done();
     assert_inv();
+    assert_mbytes();
 
     /* point */
     assert_pt_params();
