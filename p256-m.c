@@ -819,6 +819,41 @@ STATIC int scalar_from_bytes(uint32_t s[8], const uint8_t p[32])
     return -1;
 }
 
+/*
+ * Scalar generation, with public key
+ *
+ * out: sbytes the big-endian bytes representation of the scalar
+ *      s its u256 representation
+ *      x, y the affine coordinates of s * G (Montgomery domain)
+ *      return 0 if OK, non-zero on failure
+ *      sbytes, s, x, y must be discarded when returning non-zero.
+ */
+static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
+                               uint32_t x[8], uint32_t y[8])
+{
+    /* generate a random valid scalar */
+    int ret;
+    unsigned nb_tried = 0;
+    do {
+        if (nb_tried++ >= 4)
+            return -1;
+
+        ret = p256_generate_random(sbytes, 32);
+        if (ret != 0)
+            return ret;
+
+        ret = scalar_from_bytes(s, sbytes);
+    }
+    while (ret != 0);
+
+    /* compute and ouput the associated public key */
+    uint32_t z[8];
+    scalar_mult(x, y, z, p256_gx, p256_gy, s);
+    point_to_affine(x, y, z);
+
+    return 0;
+}
+
 /**********************************************************************
  *
  * ECDH
@@ -830,29 +865,11 @@ STATIC int scalar_from_bytes(uint32_t s[8], const uint8_t p[32])
  */
 int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64])
 {
-    /* generate a random valid scalar */
-    uint32_t s[8];
-    int ret;
-    unsigned nb_tried = 0;
-    do {
-        if (nb_tried++ >= 4)
-            return -1;
-
-        ret = p256_generate_random(priv, 32);
-        if (ret != 0)
-            return ret;
-
-        ret = scalar_from_bytes(s, priv);
-    }
-    while (ret != 0);
-
-    /* compute and ouput the associated public key */
-    uint32_t x[8], y[8], z[8];
-    scalar_mult(x, y, z, p256_gx, p256_gy, s);
-    point_to_affine(x, y, z);
+    uint32_t s[8], x[8], y[8];
+    int ret = scalar_gen_with_pub(priv, s, x, y);
 
     point_to_bytes(pub, x, y);
-    return 0;
+    return ret;
 }
 
 /*
