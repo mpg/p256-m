@@ -821,7 +821,7 @@ STATIC int scalar_from_bytes(uint32_t s[8], const uint8_t p[32])
 
 /**********************************************************************
  *
- * ECDH computations and interface
+ * ECDH
  *
  **********************************************************************/
 
@@ -877,6 +877,48 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
 
     m256_to_bytes(secret, x, p256_p);
     return 0;
+}
+
+/**********************************************************************
+ *
+ * ECDSA
+ *
+ * Reference:
+ * [SEC1] SEC 1: Elliptic Curve Cryptography, Certicom research, 2009.
+ *        http://www.secg.org/sec1-v2.pdf
+ **********************************************************************/
+
+/*
+ * Import integer mod n (Montgomery domain) from hash
+ *
+ * in: h = h0, ..., h_hlen
+ *     hlen the length of h in bytes
+ * out: z = (h0 * 2^l-8 + ... + h_l) * 2^256 mod n
+ *      with l = min(32, hlen)
+ *
+ * Note: in [SEC1] this is step 5 of 4.1.3 (sign) or step 3 or 4.1.4 (verify),
+ * with obvious simplications since n's bit-length is a multiple of 8.
+ */
+STATIC void ecdsa_m256_from_hash(uint32_t z[8],
+                                 const uint8_t *h, size_t hlen)
+{
+    /* convert from h (big-endian) */
+    if (hlen < 32) {
+        uint8_t p[32] = { 0 };
+        for (unsigned i = 0; i < hlen; i++)
+            p[32 - hlen + i] = h[i];
+        u256_from_bytes(z, p);
+    } else {
+        u256_from_bytes(z, h);
+    }
+
+    /* ensure the result is in [0, n) */
+    uint32_t t[8];
+    uint32_t c = u256_sub(t, z, p256_n);
+    u256_cmov(z, t, 1 - c);
+
+    /* map to Montgomery domain */
+    m256_prep(z, p256_n);
 }
 
 /**********************************************************************
@@ -1136,6 +1178,41 @@ static const uint8_t rsgxb[32] = {
     0x7d, 0xe3, 0x19, 0x96, 0xfa, 0xd7, 0xf4, 0x4b,
     0x23, 0x2c, 0x08, 0x74, 0x98, 0xdf, 0xb0, 0xb4,
     0xc7, 0x85, 0xba, 0xfd, 0x58, 0x14, 0x28, 0xd1,
+};
+
+/* hashes from RFC 6979 A.2.5 and their derived integer */
+static const uint8_t h1[20] = {
+    0x81, 0x51, 0x32, 0x5d, 0xcd, 0xba, 0xe9, 0xe0,
+    0xff, 0x95, 0xf9, 0xf9, 0x65, 0x84, 0x32, 0xdb,
+    0xed, 0xfd, 0xb2, 0x09,
+};
+static const uint8_t h256[32] = {
+    0xaf, 0x2b, 0xdb, 0xe1, 0xaa, 0x9b, 0x6e, 0xc1,
+    0xe2, 0xad, 0xe1, 0xd6, 0x94, 0xf4, 0x1f, 0xc7,
+    0x1a, 0x83, 0x1d, 0x02, 0x68, 0xe9, 0x89, 0x15,
+    0x62, 0x11, 0x3d, 0x8a, 0x62, 0xad, 0xd1, 0xbf,
+};
+static const uint8_t h512[64] = {
+    0x39, 0xa5, 0xe0, 0x4a, 0xaf, 0xf7, 0x45, 0x5d,
+    0x98, 0x50, 0xc6, 0x05, 0x36, 0x4f, 0x51, 0x4c,
+    0x11, 0x32, 0x4c, 0xe6, 0x40, 0x16, 0x96, 0x0d,
+    0x23, 0xd5, 0xdc, 0x57, 0xd3, 0xff, 0xd8, 0xf4,
+    0x9a, 0x73, 0x94, 0x68, 0xab, 0x80, 0x49, 0xbf,
+    0x18, 0xee, 0xf8, 0x20, 0xcd, 0xb1, 0xad, 0x6c,
+    0x90, 0x15, 0xf8, 0x38, 0x55, 0x6b, 0xc7, 0xfa,
+    0xd4, 0x13, 0x8b, 0x23, 0xfd, 0xf9, 0x86, 0xc7,
+};
+static const uint32_t h1_e[8] = {
+    0xdde9d09d, 0x567c03c9, 0x3104fbca, 0x03fbdb93,
+    0x923a4ce6, 0x335c3807, 0x96e1d39d, 0x0b5edb73,
+};
+static const uint32_t h256_e[8] = {
+    0x4a0eb022, 0x52b32d05, 0x51d05b7d, 0x3148ba99,
+    0x3f568a92, 0x215717d1, 0x60d91a92, 0x4e9d7cca,
+};
+static const uint32_t h512_e[8] = {
+    0xcbdfee5c, 0x1b568e98, 0x7e0c99f2, 0x7831e4b0,
+    0x264c477c, 0x9e25d3a9, 0x84368689, 0x186d34e8,
 };
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
@@ -1677,6 +1754,24 @@ static void assert_ecdh(void)
     assert(ret != 0);
 }
 
+/*
+ * ECDSA
+ */
+
+static void assert_ecdsa_from_hash(void)
+{
+    uint32_t z[8];
+
+    ecdsa_m256_from_hash(z, h1, sizeof h1);
+    assert(memcmp(z, h1_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h256, sizeof h256);
+    assert(memcmp(z, h256_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h512, sizeof h512);
+    assert(memcmp(z, h512_e, sizeof z) == 0);
+}
+
 int main(void)
 {
     /* Just to keep the function used */
@@ -1714,5 +1809,8 @@ int main(void)
 
     /* ecdh */
     assert_ecdh();
+
+    /* ecdsa */
+    assert_ecdsa_from_hash();
 }
 #endif

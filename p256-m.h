@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 
 /*
  * RNG function - must be provided externally
