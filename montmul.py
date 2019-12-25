@@ -134,27 +134,37 @@ def c_hex(name, hex_str):
     v = int(hex_str, 16)
     c_bytes(name, v, n)
 
-c_hex("h1", h1)
-c_hex("h256", h256)
-c_hex("h512", h512)
+# c_hex("h1", h1)
+# c_hex("h256", h256)
+# c_hex("h512", h512)
 
 def print_e(name, h):
     e = ecdsa_modint_from_hash(bytes.fromhex(h), p256.n, 256)
     e_mont = int(e) * 2**256 % p256.n
     c_print(name, e_mont)
 
-print_e("h1_e", h1)
-print_e("h256_e", h256)
-print_e("h512_e", h512)
+# print_e("h1_e", h1)
+# print_e("h256_e", h256)
+# print_e("h512_e", h512)
 
-#c_bytes("k1", k1, 32)
-#c_bytes("r1", r1, 32)
-#c_bytes("s1", s1, 32)
-#
-#c_bytes("k256", k256, 32)
-#c_bytes("r256", r256, 32)
-#c_bytes("s256", s256, 32)
-#
-#c_bytes("k512", k512, 32)
-#c_bytes("r512", r512, 32)
-#c_bytes("s512", s512, 32)
+def c_pair(name, r, s):
+    val = 2**256 * r + s
+    c_bytes(name, val, 64)
+
+c_bytes("k1", k1, 32)
+c_pair("sig1", r1, s1)
+
+c_bytes("k256", k256, 32)
+c_pair("sig256", r256, s256)
+
+c_bytes("k512", k512, 32)
+c_pair("sig512", r512, s512)
+
+# key material from RFC 6979 A.2.5
+
+x = 0xC9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721
+Ux = 0x60FED4BA255A9D31C961EB74C6356D68C049B8923B61FA6CE669622E60F29FB6
+Uy = 0x7903FE1008B8BC99A41AE9E95628BC64F2F1B20C2D7E9F5177A3C294D4462299
+
+c_bytes("ecdsa_priv", x, 32)
+c_pair("ecdsa_pub", Ux, Uy)
