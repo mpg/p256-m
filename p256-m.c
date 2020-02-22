@@ -622,7 +622,7 @@ static void point_double(uint32_t x[8], uint32_t y[8], uint32_t z[8])
  *
  * in: P_in = (x1:y1:z1), must be on the curve and not the origin
  *     Q = (x2, y2), must be on the curve and not P_in or -P_in
- * out: P_out = (x3:y3:z3) = P_in + Q
+ * out: P_out = (x1:y1:z1) = P_in + Q
  */
 STATIC void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
                       const uint32_t x2[8], const uint32_t y2[8])
@@ -670,6 +670,43 @@ STATIC void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
     m256_mul(t3, t3, t2, p256_p);
     m256_mul(t1, t1, y1, p256_p);
     m256_sub(y1, t3, t1, p256_p);
+}
+
+/*
+ * Point addition or doubling (affine to jacobian, Montgomery domain)
+ *
+ * in: P = (x1, y1) - must be on the curve and not the origin
+ *     Q = (x2, y2) - must be on the curve and not the origin
+ * out: (x3:y3:z3) = R = P + Q
+ *
+ * Note: unlike point_add(), this function works if P = +- Q;
+ * however it leaks information on its input through timing,
+ * branches taken and memory access patterns (if observable).
+ */
+STATIC void point_add_or_double_leaky(
+                        uint32_t x3[8], uint32_t y3[8], uint32_t z3[8],
+                        const uint32_t x1[8], const uint32_t y1[8],
+                        const uint32_t x2[8], const uint32_t y2[8])
+{
+    if (u256_diff(x1, x2) != 0) {
+        // P != +- Q -> generic addition
+        u256_cmov(x3, x1, 1);
+        u256_cmov(y3, y1, 1);
+        m256_set32(z3, 1, p256_p);
+        point_add(x3, y3, z3, x2, y2);
+    }
+    else if (u256_diff(y1, y2) == 0) {
+        // P == Q -> double
+        u256_cmov(x3, x1, 1);
+        u256_cmov(y3, y1, 1);
+        m256_set32(z3, 1, p256_p);
+        point_double(x3, y3, z3);
+    } else {
+        // P == -Q -> zero
+        m256_set32(x3, 1, p256_p);
+        m256_set32(y3, 1, p256_p);
+        m256_set32(z3, 0, p256_p);
+    }
 }
 
 /*
@@ -1618,6 +1655,51 @@ static void assert_pt_add(void)
     assert(memcmp(ty, g3y, sizeof ty) == 0);
 }
 
+static void assert_pt_add_or_double(void)
+{
+    uint32_t rx[8], ry[8], rz[8], mx[8], my[8];
+
+    /* r = 2G + G (generic addition) */
+    u256_cmov(mx, g2x, 1);
+    u256_cmov(my, g2y, 1);
+    m256_prep(mx, p256_p);
+    m256_prep(my, p256_p);
+
+    point_add_or_double_leaky(rx, ry, rz, mx, my, p256_gx, p256_gy);
+
+    point_to_affine(rx, ry, rz);
+    m256_done(rx, p256_p);
+    m256_done(ry, p256_p);
+
+    assert(memcmp(rx, g3x, sizeof rx) == 0);
+    assert(memcmp(ry, g3y, sizeof ry) == 0);
+
+    /* r = G + G (double) */
+    point_add_or_double_leaky(rx, ry, rz, p256_gx, p256_gy, p256_gx, p256_gy);
+
+    point_to_affine(rx, ry, rz);
+    m256_done(rx, p256_p);
+    m256_done(ry, p256_p);
+
+    assert(memcmp(rx, g2x, sizeof rx) == 0);
+    assert(memcmp(ry, g2y, sizeof ry) == 0);
+
+    /* r = (-G) + G (zero) */
+    u256_cmov(my, g1yn, 1);
+    m256_prep(my, p256_p);
+
+    point_add_or_double_leaky(rx, ry, rz, p256_gx, my, p256_gx, p256_gy);
+
+    m256_done(rx, p256_p);
+    m256_done(ry, p256_p);
+
+    u256_set32(mx, 0);
+    assert(memcmp(rz, mx, sizeof rz) == 0);
+    u256_set32(mx, 1);
+    assert(memcmp(rx, mx, sizeof rx) == 0);
+    assert(memcmp(ry, mx, sizeof rx) == 0);
+}
+
 static void assert_pt_bytes(void)
 {
     uint8_t p[64];
@@ -1980,6 +2062,7 @@ int main(void)
     assert_pt_affine();
     assert_pt_double();
     assert_pt_add();
+    assert_pt_add_or_double();
     assert_pt_bytes();
 
     /* scalar */
