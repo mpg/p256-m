@@ -1,3 +1,7 @@
+/*
+ * Interface of curve P-256 (ECDH and ECDSA)
+ */
+
 #include <stdint.h>
 #include <stddef.h>
 

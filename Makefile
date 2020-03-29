@@ -1,10 +1,10 @@
-TESTBIN=test
+TESTBIN=test-whitebox
 SRC=p256-m.c
 
 runtest: $(TESTBIN)
 	./$(TESTBIN)
 
-$(TESTBIN): $(SRC)
+$(TESTBIN): test-whitebox.c $(SRC)
 	clang -Weverything --std=c99 -O1 $< -o $@
 
 all: runtest
