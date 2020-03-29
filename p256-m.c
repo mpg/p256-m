@@ -7,12 +7,6 @@
 #include <stdlib.h>
 #endif
 
-#if defined(NO_MAIN)
-#define STATIC
-#else
-#define STATIC static
-#endif
-
 /**********************************************************************
  *
  * Operations on fixed-width unsigned integers
@@ -172,7 +166,7 @@ static void u288_rshift32(uint32_t z[9], uint32_t c)
  * in: p = p0, ..., p31
  * out: z = p0 * 2^248 + p1 * 2^240 + ... + p30 * 2^8 + p31
  */
-STATIC void u256_from_bytes(uint32_t z[8], const uint8_t p[32])
+static void u256_from_bytes(uint32_t z[8], const uint8_t p[32])
 {
     for (unsigned i = 0; i < 8; i++) {
         unsigned j = 4 * (7 - i);
@@ -190,7 +184,7 @@ STATIC void u256_from_bytes(uint32_t z[8], const uint8_t p[32])
  * out: p = p0, ..., p31 such that
  *      z = p0 * 2^248 + p1 * 2^240 + ... + p30 * 2^8 + p31
  */
-STATIC void u256_to_bytes(uint8_t p[32], const uint32_t z[8])
+static void u256_to_bytes(uint8_t p[32], const uint32_t z[8])
 {
     for (unsigned i = 0; i < 8; i++) {
         unsigned j = 4 * (7 - i);
@@ -227,7 +221,7 @@ static const uint32_t p256_p[8] = {     /* the curve's p */
     0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
 };
 
-STATIC const uint32_t p256_n[8] = {     /* the curve's n */
+static const uint32_t p256_n[8] = {     /* the curve's n */
     0xFC632551, 0xF3B9CAC2, 0xA7179E84, 0xBCE6FAAD,
     0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
 };
@@ -367,7 +361,7 @@ static void m256_prep(uint32_t z[8], const uint32_t m[8])
  * out: z_out = z_in / 2^256 mod m, in [0, m)
  * That is, z_in was z_actual * 2^256 mod m, and z_out is z_actual
  */
-STATIC void m256_done(uint32_t z[8], const uint32_t m[8])
+static void m256_done(uint32_t z[8], const uint32_t m[8])
 {
     uint32_t one[8];
     u256_set32(one, 1);
@@ -444,7 +438,7 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
  *      return 0 if the number was already in [0, m), or -1.
  *      z may be incorrect and must be discared when -1 is returned.
  */
-STATIC int m256_from_bytes(uint32_t z[8],
+static int m256_from_bytes(uint32_t z[8],
                            const uint8_t p[32], const uint32_t m[8])
 {
     u256_from_bytes(z, p);
@@ -465,7 +459,7 @@ STATIC int m256_from_bytes(uint32_t z[8],
  * out: p = p0, ..., p31 such that
  *      z = (p0 * 2^248 + ... + p31) * 2^256 mod m
  */
-STATIC void m256_to_bytes(uint8_t p[32],
+static void m256_to_bytes(uint8_t p[32],
                           const uint32_t z[8], const uint32_t m[8])
 {
     uint32_t zi[8];
@@ -517,11 +511,11 @@ static const uint32_t p256_b[8] = { /* b * 2^256 mod p */
  * The curve's conventional base point G.
  * Compared to the standard, coordinates converted to the Montgomery domain.
  */
-STATIC const uint32_t p256_gx[8] = { /* G_x * 2^256 mod p */
+static const uint32_t p256_gx[8] = { /* G_x * 2^256 mod p */
     0x18a9143c, 0x79e730d4, 0x5fedb601, 0x75ba95fc,
     0x77622510, 0x79fb732b, 0xa53755c6, 0x18905f76,
 };
-STATIC const uint32_t p256_gy[8] = { /* G_y * 2^256 mod p */
+static const uint32_t p256_gy[8] = { /* G_y * 2^256 mod p */
     0xce95560a, 0xddf25357, 0xba19e45c, 0x8b4ab8e4,
     0xdd21f325, 0xd2e88688, 0x25885d85, 0x8571ff18,
 };
@@ -532,7 +526,7 @@ STATIC const uint32_t p256_gy[8] = { /* G_y * 2^256 mod p */
  * in: x, y in [0, p)   (Montgomery domain)
  * out: 0 if the point lies on the curve, unspecified non-zero otherwise
  */
-STATIC uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
+static uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
 {
     uint32_t lhs[8], rhs[8];
 
@@ -557,7 +551,7 @@ STATIC uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
  *      y_out = y_in / z_in^3   (Montgomery domain)
  *      z_out unspecified, must be disregarded
  */
-STATIC void point_to_affine(uint32_t x[8], uint32_t y[8], uint32_t z[8])
+static void point_to_affine(uint32_t x[8], uint32_t y[8], uint32_t z[8])
 {
     uint32_t t[8];
 
@@ -624,7 +618,7 @@ static void point_double(uint32_t x[8], uint32_t y[8], uint32_t z[8])
  *     Q = (x2, y2), must be on the curve and not P_in or -P_in
  * out: P_out = (x1:y1:z1) = P_in + Q
  */
-STATIC void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
+static void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
                       const uint32_t x2[8], const uint32_t y2[8])
 {
     /*
@@ -683,7 +677,7 @@ STATIC void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
  * however it leaks information on its input through timing,
  * branches taken and memory access patterns (if observable).
  */
-STATIC void point_add_or_double_leaky(
+static void point_add_or_double_leaky(
                         uint32_t x3[8], uint32_t y3[8], uint32_t z3[8],
                         const uint32_t x1[8], const uint32_t y1[8],
                         const uint32_t x2[8], const uint32_t y2[8])
@@ -718,7 +712,7 @@ STATIC void point_add_or_double_leaky(
  *             unspecified non-zero otherwise.
  *      x and y are unspecified and must be discarded if returning non-zero.
  */
-STATIC int point_from_bytes(uint32_t x[8], uint32_t y[8], const uint8_t p[64])
+static int point_from_bytes(uint32_t x[8], uint32_t y[8], const uint8_t p[64])
 {
     int ret;
 
@@ -739,7 +733,7 @@ STATIC int point_from_bytes(uint32_t x[8], uint32_t y[8], const uint8_t p[64])
  * in: x, y affine coordinates of a point (Montgomery domain)
  * out: p = (x, y) concatenated, fixed-width 256-bit big-endian integers
  */
-STATIC void point_to_bytes(uint8_t p[64],
+static void point_to_bytes(uint8_t p[64],
                            const uint32_t x[8], const uint32_t y[8])
 {
     m256_to_bytes(p,        x, p256_p);
@@ -759,7 +753,7 @@ STATIC void point_to_bytes(uint8_t p[64],
  *     s in [1, n-1]
  * out: R = s * P = (rx:ry:rz), jacobian coordinates (Montgomery).
  */
-STATIC void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
+static void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
                         const uint32_t px[8], const uint32_t py[8],
                         const uint32_t s[8])
 {
@@ -840,7 +834,7 @@ STATIC void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
  *      return 0 if s in [1, n-1],
  *            -1 otherwise.
  */
-STATIC int scalar_from_bytes(uint32_t s[8], const uint8_t p[32])
+static int scalar_from_bytes(uint32_t s[8], const uint8_t p[32])
 {
     u256_from_bytes(s, p);
 
@@ -953,7 +947,7 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
  * Note: in [SEC1] this is step 5 of 4.1.3 (sign) or step 3 or 4.1.4 (verify),
  * with obvious simplications since n's bit-length is a multiple of 8.
  */
-STATIC void ecdsa_m256_from_hash(uint32_t z[8],
+static void ecdsa_m256_from_hash(uint32_t z[8],
                                  const uint8_t *h, size_t hlen)
 {
     /* convert from h (big-endian) */
