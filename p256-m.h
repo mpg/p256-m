@@ -27,3 +27,9 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
  */
 int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
                     const uint8_t *hash, size_t hlen);
+
+/*
+ * ECDSA verify
+ */
+int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
+                      const uint8_t *hash, size_t hlen);

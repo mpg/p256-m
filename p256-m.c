@@ -1034,6 +1034,78 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     return 0;
 }
 
+/*
+ * ECDSA verify
+ */
+int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
+                      const uint8_t *hash, size_t hlen)
+{
+    /*
+     * Steps and notations from [SEC1] 4.1.3
+     */
+    int ret;
+
+    /* 1. Validate range of r and s */
+    uint32_t r[8], s[8];
+    ret = scalar_from_bytes(r, sig);
+    if (ret != 0)
+        return ret;
+    ret = scalar_from_bytes(s, sig + 32);
+    if (ret != 0)
+        return ret;
+
+    /* 2. Skipped - we take the hash as an input, not the message */
+
+    /* 3. Derive an integer from the hash */
+    uint32_t e[8];
+    ecdsa_m256_from_hash(e, hash, hlen);
+
+    /* 4. Compute u1 and u2 */
+    uint32_t u1[8], u2[8];
+    m256_prep(s, p256_n);           /* s in Montgomery domain */
+    m256_inv(s, s, p256_n);         /* s = s^-1 mod n */
+    m256_mul(u1, e, s, p256_n);     /* u1 = e * s^-1 mod n */
+    m256_done(u1, p256_n);          /* u1 out of Montgomery domain */
+
+    u256_cmov(u2, r, 1);
+    m256_prep(u2, p256_n);          /* r in Montgomery domain */
+    m256_mul(u2, u2, s, p256_n);    /* u2 = r * s^-1 mod n */
+    m256_done(u2, p256_n);          /* u2 out of Montgomery domain */
+
+    /* 5. Compute R */
+    uint32_t px[8], py[8];
+    ret = point_from_bytes(px, py, pub);
+    if (ret != 0)
+        return ret;
+
+    uint32_t r1x[8], r1y[8], r1z[8];
+    scalar_mult(r1x, r1y, r1z, p256_gx, p256_gy, u1);  /* R1 = u1 * G */
+    point_to_affine(r1x, r1y, r1z);
+
+    uint32_t r2x[8], r2y[8], r2z[8];
+    scalar_mult(r2x, r2y, r2z, px, py, u2);            /* R2 = u2 * Qu */
+    point_to_affine(r2x, r2y, r2z);
+
+    uint32_t rx[8], ry[8], rz[8];
+    point_add_or_double_leaky(rx, ry, rz, r1x, r1y, r2x, r2y);  /* R = R1 + R2 */
+    // TODO: if rz == 0 -> return invalid */
+    point_to_affine(rx, ry, rz);
+
+    /* 6. Convert xR to an integer */
+    m256_done(rx, p256_p);
+
+    /* 7. Reduce xR mod n */
+    uint32_t c = u256_sub(ry, rx, p256_n);
+    u256_cmov(rx, ry, 1 - c);
+
+    /* 8. Compare xR mod n to r */
+    uint32_t diff = u256_diff(rx, r);
+    if (diff == 0)
+        return 0;
+
+    return -1;
+}
+
 /**********************************************************************
  *
  * Functions and data for testing and debugging
@@ -1393,7 +1465,6 @@ static const uint8_t ecdsa_priv[32] = {
     0x4e, 0x50, 0xc3, 0xdb, 0x36, 0xe8, 0x9b, 0x12,
     0x7b, 0x8a, 0x62, 0x2b, 0x12, 0x0f, 0x67, 0x21,
 };
-#if 0
 static const uint8_t ecdsa_pub[64] = {
     0x60, 0xfe, 0xd4, 0xba, 0x25, 0x5a, 0x9d, 0x31,
     0xc9, 0x61, 0xeb, 0x74, 0xc6, 0x35, 0x6d, 0x68,
@@ -1404,7 +1475,6 @@ static const uint8_t ecdsa_pub[64] = {
     0xf2, 0xf1, 0xb2, 0x0c, 0x2d, 0x7e, 0x9f, 0x51,
     0x77, 0xa3, 0xc2, 0x94, 0xd4, 0x46, 0x22, 0x99,
 };
-#endif
 
 static void assert_add(const uint32_t x[8], const uint32_t y[8],
                        const uint32_t z[8], uint32_t c)
@@ -2032,6 +2102,50 @@ static void assert_ecdsa_sign(void)
     /* TODO: error cases (failing RNG, bad priv) */
 }
 
+static void assert_ecdsa_verify_one(const uint8_t sig[64],
+                                    const uint8_t *hash, size_t hlen)
+{
+    int ret;
+
+    ret = p256_ecdsa_verify(sig, ecdsa_pub, hash, hlen);
+    assert(ret == 0);
+
+    uint8_t bad_sig[64];
+
+    memcpy(bad_sig, sig, sizeof bad_sig);
+    bad_sig[0] ^= 0x80;
+    ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
+    assert(ret != 0);
+
+    memcpy(bad_sig, sig, sizeof bad_sig);
+    bad_sig[31] ^= 0x01;
+    ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
+    assert(ret != 0);
+
+    memcpy(bad_sig, sig, sizeof bad_sig);
+    bad_sig[32] ^= 0x80;
+    ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
+    assert(ret != 0);
+
+    memcpy(bad_sig, sig, sizeof bad_sig);
+    bad_sig[63] ^= 0x01;
+    ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
+    assert(ret != 0);
+}
+
+static void assert_ecdsa_verify(void)
+{
+    assert_ecdsa_verify_one(sig1, h1, sizeof h1);
+    assert_ecdsa_verify_one(sig256, h256, sizeof h256);
+    assert_ecdsa_verify_one(sig512, h512, sizeof h512);
+
+    /* TODO: more error cases:
+     * r, s out of range
+     * pub invalid
+     * R is the point at infinity if possible (used crafted hash?)
+     */
+}
+
 int main(void)
 {
     /* Just to keep the functions used */
@@ -2075,5 +2189,6 @@ int main(void)
     /* ecdsa */
     assert_ecdsa_from_hash();
     assert_ecdsa_sign();
+    assert_ecdsa_verify();
 }
 #endif
