@@ -1,4 +1,5 @@
 test-whitebox
+test-data.h
 *.o
 *.s
 *.dump

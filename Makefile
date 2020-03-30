@@ -16,6 +16,6 @@ all: runtest
 	./stack.sh | sed -n 's/^..p256-m.c *//p' | head
 
 clean:
-	rm -f $(TESTBIN) *.s *.o *.dump *.sizes *.su *.dfinish
+	rm -f $(TESTBIN) $(TESTDATA) *.s *.o *.dump *.sizes *.su *.dfinish
 
 .PHONY: runtest clean all
