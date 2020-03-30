@@ -8,6 +8,9 @@ runtest: $(TESTBIN)
 $(TESTBIN): test-whitebox.c $(TESTDATA) $(SRC)
 	clang -Weverything --std=c99 -O1 $< -o $@
 
+$(TESTDATA): gen-test-data.py
+	python $< > $@
+
 all: runtest
 	./sizes.sh
 	./stack.sh | sed -n 's/^..p256-m.c *//p' | head
