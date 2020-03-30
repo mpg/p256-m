@@ -1,46 +1,57 @@
 #!/usr/bin/python3
 # coding: utf-8
 
+"""A simple implementation of P-256 (ECDH, ECDSA) for tests."""
+
 import secrets
 
+
 class ModInt:
-    """Modular integer"""
+    """Modular integer."""
 
     def __init__(self, x, n):
-        """x mod n"""
+        """Build x mod n."""
         self.x = x % n
         self.n = n
 
     def __repr__(self):
+        """Represent self."""
         return "ModInt({}, {})".format(self.x, self.n)
 
     def __int__(self):
+        """Return the representant in [0, n)."""
         return self.x
 
     def __eq__(self, other):
+        """Compare to another ModInt."""
         return self.x == other.x and self.n == other.n
 
     def __add__(self, other):
+        """Add to another ModInt."""
         return ModInt(self.x + other.x, self.n)
 
     def __sub__(self, other):
+        """Subtract another ModInt."""
         return ModInt(self.x - other.x, self.n)
 
     def __neg__(self):
+        """Negate self."""
         return ModInt(-self.x, self.n)
 
     def __mul__(self, other):
+        """Multiply by another ModInt."""
         return ModInt(self.x * other.x, self.n)
 
     def __rmul__(self, other):
-        """Multiply self by an integer"""
+        """Multiply self by an integer."""
         return ModInt(self.x * other, self.n)
 
     def __pow__(self, other):
+        """Elevate to an integer power."""
         return ModInt(pow(self.x, other, self.n), self.n)
 
     def inv(self):
-        """Return modular inverse as a ModInt or raise ZeroDIvisionError"""
+        """Return modular inverse as a ModInt or raise ZeroDivisionError."""
         a, b, u, s = self.x, self.n, 1, 0
         # invariants: a < b and a == u*x mod n and b == s*x mod n
         while a > 1:
@@ -51,18 +62,22 @@ class ModInt:
         return ModInt(u, self.n)
 
     def __truediv__(self, other):
+        """Divide by another ModInt or raise ZeroDivisionError."""
         return self * other.inv()
 
     def is_zero(self):
+        """Tell if we're 0."""
         return self.x == 0
 
 
 class Curve:
-    """Curve parameters - Short Weierstrass curves over GF(p), p > 3"""
+    """Curve parameters - Short Weierstrass curves over GF(p), p > 3."""
+
     # assuming cofactor of 1 (true for NIST and Brainpool curves),
     # so n is the order of the curve and of the base point G
 
     def __init__(self, name, *, p, a, b, gx, gy, n):
+        """Build a Curve from the given int parameters."""
         self.name = name
         self.p = p
         self.a = ModInt(a, p)
@@ -78,12 +93,15 @@ class Curve:
         self.n_bytes = (self.n_bits + 7) // 8
 
     def __str__(self):
+        """Human-friendly name."""
         return self.name
 
     def zero(self):
+        """Return the origin (point at infinity)."""
         return CurvePoint(None, self)
 
     def base_point(self):
+        """Return this curve's conventional base point."""
         return CurvePoint((self.gx, self.gy), self)
 
 
@@ -100,23 +118,27 @@ p256 = Curve(
 
 
 class CurvePoint:
-    """Point on a Curve"""
+    """Point on a Curve."""
 
     def __init__(self, coordinates, curve):
-        """Coordinates is either a pair of ModInt or None for 0"""
+        """Coordinates is either a pair of ModInt or None for 0."""
         self.coord = coordinates
         self.curve = curve
 
     def is_zero(self):
+        """Tell if this is 0 (aka the origin aka the point at infinity."""
         return self.coord is None
 
     def x(self):
+        """Return the x coordinate as a ModInt."""
         return self.coord[0]
 
     def y(self):
+        """Return the y coordinate as a ModInt."""
         return self.coord[1]
 
     def __eq__(self, other):
+        """Compare to another point on the curve."""
         if self.is_zero() and other.is_zero():
             return True
 
@@ -126,8 +148,7 @@ class CurvePoint:
         return self.x() == other.x() and self.y() == other.y()
 
     def __add__(self, other):
-        """Add two points - RFC 6090 Appendix F.1"""
-
+        """Add to another point - RFC 6090 Appendix F.1."""
         if self.is_zero():
             return other
 
@@ -155,8 +176,7 @@ class CurvePoint:
         return CurvePoint((x3, y3), self.curve)
 
     def __rmul__(self, other):
-        """Multiply self by a positive integer"""
-
+        """Multiply self by a positive integer (scalar multiplication)."""
         # invariant: result + scale * scalar = self * other
         result = self.curve.zero()
         scale = self
@@ -175,8 +195,8 @@ def ecdsa_modint_from_hash(msg_hash, n, nbits):
     # This is Sec1 4.1.3 step 5 or 4.1.4 step 3
     # Subteps 1-3: simplify when nbits is a multiple of 8
     assert(nbits % 8 == 0)
-    l = min(32, len(msg_hash))
-    msg_hash = msg_hash[:l]
+    use_len = min(32, len(msg_hash))
+    msg_hash = msg_hash[:use_len]
     # Substep 4: 2.3.8 says big endian
     e = int.from_bytes(msg_hash, 'big')
     # Extra: mod n
@@ -184,23 +204,26 @@ def ecdsa_modint_from_hash(msg_hash, n, nbits):
 
 
 class EcdsaSigner:
+    """A private key, able to create ECDSA signatures."""
+
     def __init__(self, curve, d=None):
-        """Create an ECDSA private key for curve or load it from an int"""
+        """Create an ECDSA private key for curve or load it from an int."""
         self.curve = curve
         self.d = d if d is not None else self._gen_scalar()
 
     def _gen_scalar(self):
-        # sec1 3.2.1: d in [1, n-1]
-        return secrets.randbelow(self.curve.n - 2) + 1
+        # sec1 3.2.1: d in [1, n-1] ( = [0, n-1) + 1 )
+        return secrets.randbelow(self.curve.n - 1) + 1
 
     def _gen_public(self, d):
         return d * self.curve.base_point()
 
     def public_key(self):
+        """Return the associated public key as a CurvePoint."""
         return self._gen_public(self.d)
 
     def sign(self, msg_hash, k=None):
-        """Generate a signature (int pair) for that message hash (bytes)"""
+        """Generate a signature (int pair) for that message hash (bytes)."""
         # sec1 4.1.3, but instead of retrying just abort
         n = self.curve.n
         nbits = self.curve.n_bits
@@ -224,13 +247,15 @@ class EcdsaSigner:
 
 
 class EcdsaVerifier:
+    """An ECDSA public key, able to verify signatures."""
+
     def __init__(self, curve, public_key):
-        """Create an ECDSA verifier from a public key (CurvePoint)"""
+        """Create an ECDSA verifier from a public key (CurvePoint)."""
         self.curve = curve
         self.Q = public_key
 
     def is_valid(self, sig, msg_hash):
-        """Tell if signature (int pair) is valid for that hash (bytes)"""
+        """Tell if signature (int pair) is valid for that hash (bytes)."""
         # sec1 4.1.4
         n = self.curve.n
         nbits = self.curve.n_bits
@@ -317,8 +342,8 @@ if __name__ == '__main__':
     # hashes of "sample" (6 bytes) with SHA-1, SHA-256, SHA-512
     h1 = "8151325dcdbae9e0ff95f9f9658432dbedfdb209"
     h256 = "af2bdbe1aa9b6ec1e2ade1d694f41fc71a831d0268e9891562113d8a62add1bf"
-    h512 = ("39a5e04aaff7455d9850c605364f514c11324ce64016960d23d5dc57d3ffd8f4"
-        + "9a739468ab8049bf18eef820cdb1ad6c9015f838556bc7fad4138b23fdf986c7")
+    h512 = "39a5e04aaff7455d9850c605364f514c11324ce64016960d23d5dc57d3ffd8f4"
+    h512 += "9a739468ab8049bf18eef820cdb1ad6c9015f838556bc7fad4138b23fdf986c7"
     hashes = tuple(bytes.fromhex(h) for h in (h1, h256, h512))
 
     k1 = 0x882905F1227FD620FBF2ABF21244F0BA83D0DC3A9103DBBEE43A1FB858109DB4
@@ -340,9 +365,9 @@ if __name__ == '__main__':
     for h, k, r, s in zip(hashes, ks, rs, ss):
         sig = signer.sign(h, k)
         assert(sig == (r, s))
-        assert(verif.is_valid((r,s), h) is True)
-        assert(verif.is_valid((r+1,s), h) is False)
-        assert(verif.is_valid((r,s+1), h) is False)
-        assert(verif.is_valid((r,s), h[::-1]) is False)
+        assert(verif.is_valid((r, s), h) is True)
+        assert(verif.is_valid((r+1, s), h) is False)
+        assert(verif.is_valid((r, s+1), h) is False)
+        assert(verif.is_valid((r, s), h[::-1]) is False)
 
     print("OK")
