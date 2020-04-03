@@ -6,6 +6,7 @@
  */
 
 #include "p256-m.c"
+#define TEST_WHITE
 #include "test-data.h"
 
 #include <stdio.h>

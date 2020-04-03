@@ -1,4 +1,5 @@
 test-whitebox
+test-blackbox
 test-data.h
 *.o
 *.s

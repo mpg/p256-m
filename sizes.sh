@@ -3,7 +3,7 @@
 set -eu
 
 SRC=p256-m.c
-CFLAGS_COMMON="-Werror --std=c99 -fomit-frame-pointer -D NO_MAIN $SRC"
+CFLAGS_COMMON="-Werror --std=c99 -fomit-frame-pointer $SRC"
 
 gcc() {
     arm-none-eabi-gcc -Wall -Wextra -pedantic -mthumb \
