@@ -88,16 +88,6 @@ def com(msg):
     print("\n/*", msg, "*/")
 
 
-def start(kind):
-    """Add an ifdef directive for this kind of test."""
-    print("\n#if defined(TEST_{})".format(kind.upper()))
-
-
-def stop():
-    """Add an endif directive."""
-    print("#endif\n")
-
-
 # These constants are not in test data but in the code itself
 # This is how they were generated for reference.
 #
@@ -117,7 +107,6 @@ print("""
 r = 0x760cd745ec0db49cf76db5ed0a14613ed937cbcb9c4ecc3c7d3d0eb8dcd1d063
 s = 0x17380bcf120eb6d7dde65249accbcfffb3b1c6ed5444fc98c5e403b2514595c2
 
-start("white")
 com("General-purpose random values")
 c_print('r', r)
 c_print('s', s)
@@ -226,5 +215,3 @@ com("key material from RFC A.2.5")
 key = tv_ecdsa_rfc6979_key
 c_bytes("ecdsa_priv", key['x'], 32)
 c_pair("ecdsa_pub", key['Ux'], key['Uy'])
-
-stop()
