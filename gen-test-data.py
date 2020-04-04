@@ -238,6 +238,13 @@ c_pair("sig_bad_s0", sigr, 0)
 c_pair("sig_bad_sn", sigr, p256.n)
 c_pair("sig_bad_sm", sigr, top - 1)
 
+com("ECDSA: crafted hash value that gives s == 0 with given k (hence r)")
+sigr = ModInt(sigr, p256.n)
+d = ModInt(tv_ecdsa_rfc6979_key['x'], p256.n)
+# 0 == s == e + rd / k  <=>  e = -rd
+e =  - sigr * d
+c_bytes("h256a_s0", int(e), 32)
+
 com("ECDH test vectors from NIST")
 for i, tv in enumerate(tv_ecdh_nist):
     base = "ecdh" + str(i) + "_"

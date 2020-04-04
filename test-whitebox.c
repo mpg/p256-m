@@ -644,7 +644,14 @@ static void assert_ecdsa_sign(void)
     assert(ret == 0);
     assert(nb_drawn == 96);
 
-    /* TODO: can we reach s == 0 with chosen k and hash? */
+    /* crafted hash value to reach s == 0 */
+    memset(sig, 42, sizeof sig);
+    fix_rng(k256a, 32, 0);
+    ret = p256_ecdsa_sign(sig, ecdsa_priv, h256a_s0, sizeof h256a_s0);
+    assert(ret == -1);
+    for (unsigned i = 0; i < 32; i++) {
+        assert(sig[i] == 0 && sig[i+32] == 42);
+    }
 }
 
 /* TODO: ecdsa verify internal edge case for add_or_double? */
