@@ -543,58 +543,24 @@ static void assert_rng_for_tests(void)
 /*
  * ECDH functions
  */
-static void assert_ecdh(void)
+
+static void assert_ecdh_gen_pair(void)
 {
     int ret;
     uint8_t priv[32], pub[64];
 
-    /* gen_pair - known values */
-    fix_rng(rbytes, 32, 0);
-    ret = p256_ecdh_gen_pair(priv, pub);
-    assert(ret == 0);
-    assert(memcmp(priv, rbytes, sizeof priv) == 0);
-    assert(memcmp(pub, rgb, sizeof pub) == 0);
-
-    fix_rng(sbytes, 32, 0);
-    ret = p256_ecdh_gen_pair(priv, pub);
-    assert(ret == 0);
-    assert(memcmp(priv, sbytes, sizeof priv) == 0);
-    assert(memcmp(pub, sgb, sizeof pub) == 0);
-
-    /* gen_pair - error conditions */
-    fix_rng(rbytes, 32, 42);
-    ret = p256_ecdh_gen_pair(priv, pub);
-    assert(ret == 42);
-
+    /* non-random RNG - always zero */
     fix_rng(NULL, 128, 0);
     ret = p256_ecdh_gen_pair(priv, pub);
     assert(ret == -1);
 
+    /* unlucky RNG, need to retry */
     memset(pub, 0, 32);
     u256_to_bytes(pub + 32, p256_n);
     fix_rng(pub, 64, 0);
     ret = p256_ecdh_gen_pair(priv, pub);
     assert(ret == 0);
     assert(nb_drawn == 96);
-
-    /* shared secret - known values */
-    uint8_t secret[32];
-    ret = p256_ecdh_shared_secret(secret, rbytes, sgb);
-    assert(ret == 0);
-    assert(memcmp(secret, rsgxb, sizeof secret) == 0);
-
-    ret = p256_ecdh_shared_secret(secret, sbytes, rgb);
-    assert(ret == 0);
-    assert(memcmp(secret, rsgxb, sizeof secret) == 0);
-
-    /* shared secret - error conditions */
-    u256_to_bytes(priv, p256_n);
-    ret = p256_ecdh_shared_secret(secret, priv, sgb);
-    assert(ret != 0);
-
-    u256_to_bytes(pub, p256_p);
-    ret = p256_ecdh_shared_secret(secret, rbytes, pub);
-    assert(ret != 0);
 }
 
 /*
@@ -662,7 +628,22 @@ static void assert_ecdsa_sign(void)
     assert_ecdsa_sign_one(k384b, sig384b, h384b, sizeof h384b);
     assert_ecdsa_sign_one(k512b, sig512b, h512b, sizeof h512b);
 
-    /* TODO: non-random RNG */
+    uint8_t sig[64];
+    int ret;
+
+    /* non-random RNG */
+    fix_rng(NULL, 128, 0);
+    ret = p256_ecdsa_sign(sig, ecdsa_priv, h256a, sizeof h256a);
+    assert(ret == -1);
+
+    /* unlucky RNG, need to retry */
+    memset(sig, 0, 32);
+    u256_to_bytes(sig + 32, p256_n);
+    fix_rng(sig, 64, 0);
+    ret = p256_ecdsa_sign(sig, ecdsa_priv, h256a, sizeof h256a);
+    assert(ret == 0);
+    assert(nb_drawn == 96);
+
     /* TODO: can we reach s == 0 with chosen k and hash? */
 }
 
@@ -702,7 +683,7 @@ int main(void)
     assert_sbytes();
 
     /* ecdh */
-    assert_ecdh();
+    assert_ecdh_gen_pair();
 
     /* ecdsa */
     assert_ecdsa_from_hash();
