@@ -14,6 +14,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+static int rng_ret = 0;
+
 /* test version based on stdlib - never do this in production! */
 int p256_generate_random(uint8_t *output, unsigned output_size)
 {
@@ -21,7 +23,9 @@ int p256_generate_random(uint8_t *output, unsigned output_size)
         output[i] = (uint8_t) rand();
     }
 
-    return 0;
+    int ret = rng_ret;
+    rng_ret = 0;
+    return ret;
 }
 
 /* validate ecdsa_verify against one set of test vectors */
@@ -126,7 +130,9 @@ static void assert_ecdsa_sign(void)
     assert(0 != p256_ecdsa_sign(sig, priv_bad_n, h256a, sizeof h256a));
     assert(0 != p256_ecdsa_sign(sig, priv_bad_m, h256a, sizeof h256a));
 
-    /* TODO: failing RNG */
+    /* failing RNG */
+    rng_ret = 42;
+    assert(0 != p256_ecdsa_sign(sig, ecdsa_priv, h256a, sizeof h256a));
 }
 
 /* validate ecdh_shared_secret() against one test vector */
@@ -193,7 +199,10 @@ static void assert_ecdh_gen_pair(void)
     for (unsigned i = 0; i < 5; i++)
         assert_ecdh_gen_pair_one();
 
-    /* TODO: failing RNG */
+    /* failing RNG */
+    uint8_t priv[32], pub[64];
+    rng_ret = 42;
+    assert(0 != p256_ecdh_gen_pair(priv, pub));
 }
 
 int main(void)
