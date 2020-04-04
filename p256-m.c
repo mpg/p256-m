@@ -1028,8 +1028,11 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     /* 6. Compute s = k^-1 * (e + r * dU) */
     uint32_t du[8];
     ret = m256_from_bytes(du, priv, p256_n);
+    /* Just validating input, so branches are OK */
     if (ret != 0)
         return ret;
+    if (u256_diff0(du) == 0)
+        return -1;
 
     uint32_t s[8];
     m256_inv(s, k, p256_n);         /* s = k^-1 */

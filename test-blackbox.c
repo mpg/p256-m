@@ -80,10 +80,20 @@ static void assert_ecdsa_verify(void)
     assert_ecdsa_verify_one(sig384b, h384b, sizeof h384b);
     assert_ecdsa_verify_one(sig512b, h512b, sizeof h512b);
 
-    /* TODO: invalid input
-     * r, s out of range
-     * pub invalid
-     */
+    /* r, s out of range */
+    const size_t hlen = sizeof h256a;
+    assert(0 != p256_ecdsa_verify(sig_bad_r0, ecdsa_pub, h256a, hlen));
+    assert(0 != p256_ecdsa_verify(sig_bad_rn, ecdsa_pub, h256a, hlen));
+    assert(0 != p256_ecdsa_verify(sig_bad_rm, ecdsa_pub, h256a, hlen));
+    assert(0 != p256_ecdsa_verify(sig_bad_s0, ecdsa_pub, h256a, hlen));
+    assert(0 != p256_ecdsa_verify(sig_bad_sn, ecdsa_pub, h256a, hlen));
+    assert(0 != p256_ecdsa_verify(sig_bad_sm, ecdsa_pub, h256a, hlen));
+
+    /* pub invalid (coordinates out of range) */
+    assert(0 != p256_ecdsa_verify(sig256a, pub_bad_xp, h256a, hlen));
+    assert(0 != p256_ecdsa_verify(sig256a, pub_bad_xm, h256a, hlen));
+    assert(0 != p256_ecdsa_verify(sig256a, pub_bad_yp, h256a, hlen));
+    assert(0 != p256_ecdsa_verify(sig256a, pub_bad_ym, h256a, hlen));
 }
 
 /* validate sign against verify */
@@ -110,7 +120,13 @@ static void assert_ecdsa_sign(void)
     assert_ecdsa_sign_one(h384b, sizeof h384b);
     assert_ecdsa_sign_one(h512b, sizeof h512b);
 
-    /* TODO: failing RNG, bad priv */
+    /* bad priv (out-of-range) */
+    uint8_t sig[64];
+    assert(0 != p256_ecdsa_sign(sig, priv_bad_0, h256a, sizeof h256a));
+    assert(0 != p256_ecdsa_sign(sig, priv_bad_n, h256a, sizeof h256a));
+    assert(0 != p256_ecdsa_sign(sig, priv_bad_m, h256a, sizeof h256a));
+
+    /* TODO: failing RNG */
 }
 
 /* validate ecdh_shared_secret() against one test vector */
@@ -137,7 +153,17 @@ static void assert_ecdh_shared(void)
     assert_ecdh_shared_one(ecdh8_z, ecdh8_d, ecdh8_o);
     assert_ecdh_shared_one(ecdh9_z, ecdh9_d, ecdh9_o);
 
-    /* TODO: bad priv, bad peer */
+    /* bad priv (out-of-range) */
+    uint8_t sec[32];
+    assert(0 != p256_ecdh_shared_secret(sec, priv_bad_0, ecdh0_o));
+    assert(0 != p256_ecdh_shared_secret(sec, priv_bad_n, ecdh0_o));
+    assert(0 != p256_ecdh_shared_secret(sec, priv_bad_m, ecdh0_o));
+
+    /* bad peer (out-of-range coordinates) */
+    assert(0 != p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_xp));
+    assert(0 != p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_xm));
+    assert(0 != p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_yp));
+    assert(0 != p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_ym));
 }
 
 /* validate ecdh_gen_pair() against ecdh_shared_secret() */

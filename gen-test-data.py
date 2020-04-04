@@ -217,6 +217,27 @@ key = tv_ecdsa_rfc6979_key
 c_bytes("ecdsa_priv", key['x'], 32)
 c_pair("ecdsa_pub", key['Ux'], key['Uy'])
 
+com("bad key matetial")
+c_bytes("priv_bad_0", 0, 32)
+c_bytes("priv_bad_n", p256.n, 32)
+c_bytes("priv_bad_m", top - 1, 32)
+
+Ux, Uy = key['Ux'], key['Uy']
+c_pair("pub_bad_xp", p256.p, Uy)
+c_pair("pub_bad_xm", top - 1, Uy)
+c_pair("pub_bad_yp", Ux, p256.p)
+c_pair("pub_bad_ym", Ux, top - 1)
+
+com("bad ECDSA signature (out-of-range)")
+tv = tv_ecdsa_rfc6979[2]
+sigr, sigs = tv['r'], tv['s']
+c_pair("sig_bad_r0", 0, sigs)
+c_pair("sig_bad_rn", p256.n, sigs)
+c_pair("sig_bad_rm", top - 1, sigs)
+c_pair("sig_bad_s0", sigr, 0)
+c_pair("sig_bad_sn", sigr, p256.n)
+c_pair("sig_bad_sm", sigr, top - 1)
+
 com("ECDH test vectors from NIST")
 for i, tv in enumerate(tv_ecdh_nist):
     base = "ecdh" + str(i) + "_"
