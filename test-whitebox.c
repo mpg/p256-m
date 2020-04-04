@@ -606,36 +606,62 @@ static void assert_ecdsa_from_hash(void)
 {
     uint32_t z[8];
 
-    ecdsa_m256_from_hash(z, h1, sizeof h1);
-    assert(memcmp(z, h1_e, sizeof z) == 0);
+    ecdsa_m256_from_hash(z, h160a, sizeof h160a);
+    assert(memcmp(z, h160a_e, sizeof z) == 0);
 
-    ecdsa_m256_from_hash(z, h256, sizeof h256);
-    assert(memcmp(z, h256_e, sizeof z) == 0);
+    ecdsa_m256_from_hash(z, h224a, sizeof h224a);
+    assert(memcmp(z, h224a_e, sizeof z) == 0);
 
-    ecdsa_m256_from_hash(z, h512, sizeof h512);
-    assert(memcmp(z, h512_e, sizeof z) == 0);
+    ecdsa_m256_from_hash(z, h256a, sizeof h256a);
+    assert(memcmp(z, h256a_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h384a, sizeof h384a);
+    assert(memcmp(z, h384a_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h512a, sizeof h512a);
+    assert(memcmp(z, h512a_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h160b, sizeof h160b);
+    assert(memcmp(z, h160b_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h224b, sizeof h224b);
+    assert(memcmp(z, h224b_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h256b, sizeof h256b);
+    assert(memcmp(z, h256b_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h384b, sizeof h384b);
+    assert(memcmp(z, h384b_e, sizeof z) == 0);
+
+    ecdsa_m256_from_hash(z, h512b, sizeof h512b);
+    assert(memcmp(z, h512b_e, sizeof z) == 0);
 }
 
-static void assert_ecdsa_sign(void)
+static void assert_ecdsa_sign_one(const uint8_t k[32], const uint8_t sigref[64],
+                                  const uint8_t *hash, size_t hlen)
 {
     int ret;
     uint8_t sig[64];
 
+    fix_rng(k, 32, 0);
+    ret = p256_ecdsa_sign(sig, ecdsa_priv, hash, hlen);
+    assert(ret == 0);
+    assert(memcmp(sig, sigref, sizeof sig) == 0);
+}
+
+static void assert_ecdsa_sign(void)
+{
     /* known values */
-    fix_rng(k1, 32, 0);
-    ret = p256_ecdsa_sign(sig, ecdsa_priv, h1, sizeof h1);
-    assert(ret == 0);
-    assert(memcmp(sig, sig1, sizeof sig) == 0);
-
-    fix_rng(k256, 32, 0);
-    ret = p256_ecdsa_sign(sig, ecdsa_priv, h256, sizeof h256);
-    assert(ret == 0);
-    assert(memcmp(sig, sig256, sizeof sig) == 0);
-
-    fix_rng(k512, 32, 0);
-    ret = p256_ecdsa_sign(sig, ecdsa_priv, h512, sizeof h512);
-    assert(ret == 0);
-    assert(memcmp(sig, sig512, sizeof sig) == 0);
+    assert_ecdsa_sign_one(k160a, sig160a, h160a, sizeof h160a);
+    assert_ecdsa_sign_one(k224a, sig224a, h224a, sizeof h224a);
+    assert_ecdsa_sign_one(k256a, sig256a, h256a, sizeof h256a);
+    assert_ecdsa_sign_one(k384a, sig384a, h384a, sizeof h384a);
+    assert_ecdsa_sign_one(k512a, sig512a, h512a, sizeof h512a);
+    assert_ecdsa_sign_one(k160b, sig160b, h160b, sizeof h160b);
+    assert_ecdsa_sign_one(k224b, sig224b, h224b, sizeof h224b);
+    assert_ecdsa_sign_one(k256b, sig256b, h256b, sizeof h256b);
+    assert_ecdsa_sign_one(k384b, sig384b, h384b, sizeof h384b);
+    assert_ecdsa_sign_one(k512b, sig512b, h512b, sizeof h512b);
 
     /* TODO: error cases (failing RNG, bad priv) */
 }
@@ -673,9 +699,17 @@ static void assert_ecdsa_verify_one(const uint8_t sig[64],
 
 static void assert_ecdsa_verify(void)
 {
-    assert_ecdsa_verify_one(sig1, h1, sizeof h1);
-    assert_ecdsa_verify_one(sig256, h256, sizeof h256);
-    assert_ecdsa_verify_one(sig512, h512, sizeof h512);
+    /* known-good values */
+    assert_ecdsa_verify_one(sig160a, h160a, sizeof h160a);
+    assert_ecdsa_verify_one(sig224a, h224a, sizeof h224a);
+    assert_ecdsa_verify_one(sig256a, h256a, sizeof h256a);
+    assert_ecdsa_verify_one(sig384a, h384a, sizeof h384a);
+    assert_ecdsa_verify_one(sig512a, h512a, sizeof h512a);
+    assert_ecdsa_verify_one(sig160b, h160b, sizeof h160b);
+    assert_ecdsa_verify_one(sig224b, h224b, sizeof h224b);
+    assert_ecdsa_verify_one(sig256b, h256b, sizeof h256b);
+    assert_ecdsa_verify_one(sig384b, h384b, sizeof h384b);
+    assert_ecdsa_verify_one(sig512b, h512b, sizeof h512b);
 
     /* TODO: more error cases:
      * r, s out of range

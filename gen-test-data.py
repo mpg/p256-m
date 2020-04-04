@@ -210,22 +210,17 @@ c_point("rgb", rg)
 c_point("sgb", sg)
 c_bytes("rsgxb", int(rsg.x()), 32)
 
-com("hashes from RFC 6979 A.2.5 and their derived integer")
-tv = tv_ecdsa_rfc6979
-c_bytestr("h1", tv[0]['h'])
-c_bytestr("h256", tv[2]['h'])
-c_bytestr("h512", tv[4]['h'])
-print_e("h1_e", tv[0]['h'])
-print_e("h256_e", tv[2]['h'])
-print_e("h512_e", tv[4]['h'])
+com("data from RFC 6979 A.2.5 + integers derived from hashes")
+for i, tv in enumerate(tv_ecdsa_rfc6979):
+    h = tv['h']
+    bits = len(h) * 8
+    case = str(bits) + "ab"[i // 5]
 
-com("signature data from RFC 6979 A.2.5")
-c_bytes("k1", tv[0]['k'], 32)
-c_pair("sig1", tv[0]['r'], tv[0]['s'])
-c_bytes("k256", tv[2]['k'], 32)
-c_pair("sig256", tv[2]['r'], tv[2]['s'])
-c_bytes("k512", tv[4]['k'], 32)
-c_pair("sig512", tv[4]['r'], tv[4]['s'])
+    c_bytestr("h" + case, h)
+    print_e("h" + case + "_e", h)
+
+    c_bytes("k" + case, tv['k'], 32)
+    c_pair("sig" + case, tv['r'], tv['s'])
 
 com("key material from RFC A.2.5")
 key = tv_ecdsa_rfc6979_key
