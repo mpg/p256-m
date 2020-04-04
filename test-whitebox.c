@@ -666,57 +666,7 @@ static void assert_ecdsa_sign(void)
     /* TODO: error cases (failing RNG, bad priv) */
 }
 
-static void assert_ecdsa_verify_one(const uint8_t sig[64],
-                                    const uint8_t *hash, size_t hlen)
-{
-    int ret;
-
-    ret = p256_ecdsa_verify(sig, ecdsa_pub, hash, hlen);
-    assert(ret == 0);
-
-    uint8_t bad_sig[64];
-
-    memcpy(bad_sig, sig, sizeof bad_sig);
-    bad_sig[0] ^= 0x80;
-    ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
-    assert(ret != 0);
-
-    memcpy(bad_sig, sig, sizeof bad_sig);
-    bad_sig[31] ^= 0x01;
-    ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
-    assert(ret != 0);
-
-    memcpy(bad_sig, sig, sizeof bad_sig);
-    bad_sig[32] ^= 0x80;
-    ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
-    assert(ret != 0);
-
-    memcpy(bad_sig, sig, sizeof bad_sig);
-    bad_sig[63] ^= 0x01;
-    ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
-    assert(ret != 0);
-}
-
-static void assert_ecdsa_verify(void)
-{
-    /* known-good values */
-    assert_ecdsa_verify_one(sig160a, h160a, sizeof h160a);
-    assert_ecdsa_verify_one(sig224a, h224a, sizeof h224a);
-    assert_ecdsa_verify_one(sig256a, h256a, sizeof h256a);
-    assert_ecdsa_verify_one(sig384a, h384a, sizeof h384a);
-    assert_ecdsa_verify_one(sig512a, h512a, sizeof h512a);
-    assert_ecdsa_verify_one(sig160b, h160b, sizeof h160b);
-    assert_ecdsa_verify_one(sig224b, h224b, sizeof h224b);
-    assert_ecdsa_verify_one(sig256b, h256b, sizeof h256b);
-    assert_ecdsa_verify_one(sig384b, h384b, sizeof h384b);
-    assert_ecdsa_verify_one(sig512b, h512b, sizeof h512b);
-
-    /* TODO: more error cases:
-     * r, s out of range
-     * pub invalid
-     * R is the point at infinity if possible (used crafted hash?)
-     */
-}
+/* TODO: ecdsa verify internal edge case for add_or_double? */
 
 int main(void)
 {
@@ -757,5 +707,4 @@ int main(void)
     /* ecdsa */
     assert_ecdsa_from_hash();
     assert_ecdsa_sign();
-    assert_ecdsa_verify();
 }
