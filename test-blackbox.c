@@ -110,7 +110,7 @@ static void assert_ecdsa_sign(void)
     assert_ecdsa_sign_one(h384b, sizeof h384b);
     assert_ecdsa_sign_one(h512b, sizeof h512b);
 
-    /* TODO: bad priv */
+    /* TODO: failing RNG, bad priv */
 }
 
 /* validate ecdh_shared_secret() against one test vector */
@@ -137,7 +137,7 @@ static void assert_ecdh_shared(void)
     assert_ecdh_shared_one(ecdh8_z, ecdh8_d, ecdh8_o);
     assert_ecdh_shared_one(ecdh9_z, ecdh9_d, ecdh9_o);
 
-    /* TODO: bad priv, bad pub */
+    /* TODO: bad priv, bad peer */
 }
 
 /* validate ecdh_gen_pair() against ecdh_shared_secret() */

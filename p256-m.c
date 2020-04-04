@@ -109,6 +109,21 @@ static uint32_t u256_diff(const uint32_t x[8], const uint32_t y[8])
 }
 
 /*
+ * 256-bit compare to zero
+ *
+ * in: x in [0, 2^256)
+ * out: 0 if x == 0, unspecified non-zero otherwise
+ */
+static uint32_t u256_diff0(const uint32_t x[8])
+{
+    uint32_t diff = 0;
+    for (unsigned i = 0; i < 8; i++) {
+        diff |= x[i];
+    }
+    return diff;
+}
+
+/*
  * 288 + 32 x 256 -> 288-bit multiply and add
  *
  * in: x in [0, 2^32)
@@ -948,6 +963,7 @@ static void ecdsa_m256_from_hash(uint32_t z[8],
                                  const uint8_t *h, size_t hlen)
 {
     /* convert from h (big-endian) */
+    /* hlen is public data so it's OK to branch on it */
     if (hlen < 32) {
         uint8_t p[32] = { 0 };
         for (unsigned i = 0; i < hlen; i++)
@@ -995,8 +1011,11 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     uint32_t c = u256_sub(yr, xr, p256_n);
     u256_cmov(xr, yr, 1 - c);
 
+    /* xr is public data so it's OK to use a branch */
+    if (u256_diff0(xr) == 0)
+        return -1;
+
     u256_to_bytes(sig, xr);
-    // TODO: if xr == 0 return -1
 
     m256_prep(xr, p256_n);
 
@@ -1019,8 +1038,15 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     m256_mul(s, s, yr, p256_n);     /* s = k^-1 * (e + r * dU) */
 
     /* 7. Output s (r already outputed at step 3) */
+
+    /* s is public data so it's OK to use a branch */
+    if (u256_diff0(s) == 0) {
+        /* undo early output of xr */
+        u256_to_bytes(sig, s);
+        return -1;
+    }
+
     m256_to_bytes(sig + 32, s, p256_n);
-    // TODO: if s == 0 return -1
 
     return 0;
 }
@@ -1079,7 +1105,9 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
 
     uint32_t rx[8], ry[8], rz[8];
     point_add_or_double_leaky(rx, ry, rz, r1x, r1y, r2x, r2y);  /* R = R1 + R2 */
-    // TODO: if rz == 0 -> return invalid */
+    /* We're using public data only so branches are OK */
+    if (u256_diff0(rz) == 0)
+        return -1;
     point_to_affine(rx, ry, rz);
 
     /* 6. Convert xR to an integer */

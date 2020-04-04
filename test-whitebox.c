@@ -663,6 +663,7 @@ static void assert_ecdsa_sign(void)
     assert_ecdsa_sign_one(k512b, sig512b, h512b, sizeof h512b);
 
     /* TODO: failing RNG, bad priv) */
+    /* TODO: can we reach s == 0 with chosen k and hash? */
 }
 
 /* TODO: ecdsa verify internal edge case for add_or_double? */
