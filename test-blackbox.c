@@ -140,10 +140,41 @@ static void assert_ecdh_shared(void)
     /* TODO: bad priv, bad pub */
 }
 
+/* validate ecdh_gen_pair() against ecdh_shared_secret() */
+static void assert_ecdh_gen_pair_one(void)
+{
+    int ret;
+    uint8_t a_priv[32], a_pub[64], a_sec[32];
+    uint8_t b_priv[32], b_pub[64], b_sec[32];
+
+    ret = p256_ecdh_gen_pair(a_priv, a_pub);
+    assert(ret == 0);
+
+    ret = p256_ecdh_gen_pair(b_priv, b_pub);
+    assert(ret == 0);
+
+    ret = p256_ecdh_shared_secret(a_sec, a_priv, b_pub);
+    assert(ret == 0);
+
+    ret = p256_ecdh_shared_secret(b_sec, b_priv, a_pub);
+    assert(ret == 0);
+
+    assert(memcmp(a_sec, b_sec, 32) == 0);
+}
+
+static void assert_ecdh_gen_pair(void)
+{
+    for (unsigned i = 0; i < 5; i++)
+        assert_ecdh_gen_pair_one();
+
+    /* TODO: failing RNG */
+}
+
 int main(void)
 {
     assert_ecdsa_verify();
     assert_ecdsa_sign();
 
     assert_ecdh_shared();
+    assert_ecdh_gen_pair();
 }
