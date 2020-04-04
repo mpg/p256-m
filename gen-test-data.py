@@ -4,7 +4,8 @@
 """Generate test data for P-256 and related functions."""
 
 from p256 import (ModInt, p256, ecdsa_modint_from_hash,
-                  tv_ecdsa_rfc6979_key, tv_ecdsa_rfc6979)
+                  tv_ecdsa_rfc6979_key, tv_ecdsa_rfc6979,
+                  tv_ecdh_nist)
 
 base = 2**32
 n_limbs = 8
@@ -199,7 +200,7 @@ c_point("rgb", rg)
 c_point("sgb", sg)
 c_bytes("rsgxb", int(rsg.x()), 32)
 
-com("data from RFC 6979 A.2.5 + integers derived from hashes")
+com("ECDSA test vectors from RFC 6979 A.2.5 + integers derived from hashes")
 for i, tv in enumerate(tv_ecdsa_rfc6979):
     h = tv['h']
     bits = len(h) * 8
@@ -215,3 +216,11 @@ com("key material from RFC A.2.5")
 key = tv_ecdsa_rfc6979_key
 c_bytes("ecdsa_priv", key['x'], 32)
 c_pair("ecdsa_pub", key['Ux'], key['Uy'])
+
+com("ECDH test vectors from NIST")
+for i, tv in enumerate(tv_ecdh_nist):
+    base = "ecdh" + str(i) + "_"
+    c_pair(base + "o", tv['ox'], tv['oy'])
+    c_bytes(base + "d", tv['d'], 32)
+    c_pair(base + "q", tv['Qx'], tv['Qy'])
+    c_bytes(base + "z", tv['Z'], 32)

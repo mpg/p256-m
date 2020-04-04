@@ -113,8 +113,37 @@ static void assert_ecdsa_sign(void)
     /* TODO: bad priv */
 }
 
+/* validate ecdh_shared_secret() against one test vector */
+static void assert_ecdh_shared_one(const uint8_t refsec[32],
+                                   const uint8_t priv[32],
+                                   const uint8_t pub[64])
+{
+    uint8_t sec[32];
+    int ret = p256_ecdh_shared_secret(sec, priv, pub);
+    assert(ret == 0);
+    assert(memcmp(sec, refsec, sizeof sec) == 0);
+}
+
+static void assert_ecdh_shared(void)
+{
+    assert_ecdh_shared_one(ecdh0_z, ecdh0_d, ecdh0_o);
+    assert_ecdh_shared_one(ecdh1_z, ecdh1_d, ecdh1_o);
+    assert_ecdh_shared_one(ecdh2_z, ecdh2_d, ecdh2_o);
+    assert_ecdh_shared_one(ecdh3_z, ecdh3_d, ecdh3_o);
+    assert_ecdh_shared_one(ecdh4_z, ecdh4_d, ecdh4_o);
+    assert_ecdh_shared_one(ecdh5_z, ecdh5_d, ecdh5_o);
+    assert_ecdh_shared_one(ecdh6_z, ecdh6_d, ecdh6_o);
+    assert_ecdh_shared_one(ecdh7_z, ecdh7_d, ecdh7_o);
+    assert_ecdh_shared_one(ecdh8_z, ecdh8_d, ecdh8_o);
+    assert_ecdh_shared_one(ecdh9_z, ecdh9_d, ecdh9_o);
+
+    /* TODO: bad priv, bad pub */
+}
+
 int main(void)
 {
     assert_ecdsa_verify();
     assert_ecdsa_sign();
+
+    assert_ecdh_shared();
 }
