@@ -86,7 +86,35 @@ static void assert_ecdsa_verify(void)
      */
 }
 
+/* validate sign against verify */
+static void assert_ecdsa_sign_one(const uint8_t *hash, size_t hlen)
+{
+    int ret;
+    uint8_t sig[64];
+
+    ret = p256_ecdsa_sign(sig, ecdsa_priv, hash, hlen);
+    assert(ret == 0);
+    assert(p256_ecdsa_verify(sig, ecdsa_pub, hash, hlen) == 0);
+}
+
+static void assert_ecdsa_sign(void)
+{
+    assert_ecdsa_sign_one(h160a, sizeof h160a);
+    assert_ecdsa_sign_one(h224a, sizeof h224a);
+    assert_ecdsa_sign_one(h256a, sizeof h256a);
+    assert_ecdsa_sign_one(h384a, sizeof h384a);
+    assert_ecdsa_sign_one(h512a, sizeof h512a);
+    assert_ecdsa_sign_one(h160b, sizeof h160b);
+    assert_ecdsa_sign_one(h224b, sizeof h224b);
+    assert_ecdsa_sign_one(h256b, sizeof h256b);
+    assert_ecdsa_sign_one(h384b, sizeof h384b);
+    assert_ecdsa_sign_one(h512b, sizeof h512b);
+
+    /* TODO: bad priv */
+}
+
 int main(void)
 {
     assert_ecdsa_verify();
+    assert_ecdsa_sign();
 }

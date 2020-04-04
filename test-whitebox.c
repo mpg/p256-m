@@ -662,7 +662,7 @@ static void assert_ecdsa_sign(void)
     assert_ecdsa_sign_one(k384b, sig384b, h384b, sizeof h384b);
     assert_ecdsa_sign_one(k512b, sig512b, h512b, sizeof h512b);
 
-    /* TODO: error cases (failing RNG, bad priv) */
+    /* TODO: failing RNG, bad priv) */
 }
 
 /* TODO: ecdsa verify internal edge case for add_or_double? */
