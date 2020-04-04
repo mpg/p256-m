@@ -294,6 +294,81 @@ tv_ecdh_rfc5903 = dict(
     giry=0x522BDE0AF0D8585B8DEF9C183B5AE38F50235206A8674ECB5D98EDB20EB153A2,
 )
 
+# NIST KAS_ECC_CDH_PrimitiveTest.txt P-256 counts 0 to 9
+tv_ecdh_nist = (
+    dict(
+        ox=0x700c48f77f56584c5cc632ca65640db91b6bacce3a4df6b42ce7cc838833d287,
+        oy=0xdb71e509e3fd9b060ddb20ba5c51dcc5948d46fbf640dfe0441782cab85fa4ac,
+        d=0x7d7dc5f71eb29ddaf80d6214632eeae03d9058af1fb6d22ed80badb62bc1a534,
+        Qx=0xead218590119e8876b29146ff89ca61770c4edbbf97d38ce385ed281d8a6b230,
+        Qy=0x28af61281fd35e2fa7002523acc85a429cb06ee6648325389f59edfce1405141,
+        Z=0x46fc62106420ff012e54a434fbdd2d25ccc5852060561e68040dd7778997bd7b,
+    ), dict(
+        ox=0x809f04289c64348c01515eb03d5ce7ac1a8cb9498f5caa50197e58d43a86a7ae,
+        oy=0xb29d84e811197f25eba8f5194092cb6ff440e26d4421011372461f579271cda3,
+        d=0x38f65d6dce47676044d58ce5139582d568f64bb16098d179dbab07741dd5caf5,
+        Qx=0x119f2f047902782ab0c9e27a54aff5eb9b964829ca99c06b02ddba95b0a3f6d0,
+        Qy=0x8f52b726664cac366fc98ac7a012b2682cbd962e5acb544671d41b9445704d1d,
+        Z=0x057d636096cb80b67a8c038c890e887d1adfa4195e9b3ce241c8a778c59cda67,
+    ), dict(
+        ox=0xa2339c12d4a03c33546de533268b4ad667debf458b464d77443636440ee7fec3,
+        oy=0xef48a3ab26e20220bcda2c1851076839dae88eae962869a497bf73cb66faf536,
+        d=0x1accfaf1b97712b85a6f54b148985a1bdc4c9bec0bd258cad4b3d603f49f32c8,
+        Qx=0xd9f2b79c172845bfdb560bbb01447ca5ecc0470a09513b6126902c6b4f8d1051,
+        Qy=0xf815ef5ec32128d3487834764678702e64e164ff7315185e23aff5facd96d7bc,
+        Z=0x2d457b78b4614132477618a5b077965ec90730a8c81a1c75d6d4ec68005d67ec,
+    ), dict(
+        ox=0xdf3989b9fa55495719b3cf46dccd28b5153f7808191dd518eff0c3cff2b705ed,
+        oy=0x422294ff46003429d739a33206c8752552c8ba54a270defc06e221e0feaf6ac4,
+        d=0x207c43a79bfee03db6f4b944f53d2fb76cc49ef1c9c4d34d51b6c65c4db6932d,
+        Qx=0x24277c33f450462dcb3d4801d57b9ced05188f16c28eda873258048cd1607e0d,
+        Qy=0xc4789753e2b1f63b32ff014ec42cd6a69fac81dfe6d0d6fd4af372ae27c46f88,
+        Z=0x96441259534b80f6aee3d287a6bb17b5094dd4277d9e294f8fe73e48bf2a0024,
+    ), dict(
+        ox=0x41192d2813e79561e6a1d6f53c8bc1a433a199c835e141b05a74a97b0faeb922,
+        oy=0x1af98cc45e98a7e041b01cf35f462b7562281351c8ebf3ffa02e33a0722a1328,
+        d=0x59137e38152350b195c9718d39673d519838055ad908dd4757152fd8255c09bf,
+        Qx=0xa8c5fdce8b62c5ada598f141adb3b26cf254c280b2857a63d2ad783a73115f6b,
+        Qy=0x806e1aafec4af80a0d786b3de45375b517a7e5b51ffb2c356537c9e6ef227d4a,
+        Z=0x19d44c8d63e8e8dd12c22a87b8cd4ece27acdde04dbf47f7f27537a6999a8e62,
+    ), dict(
+        ox=0x33e82092a0f1fb38f5649d5867fba28b503172b7035574bf8e5b7100a3052792,
+        oy=0xf2cf6b601e0a05945e335550bf648d782f46186c772c0f20d3cd0d6b8ca14b2f,
+        d=0xf5f8e0174610a661277979b58ce5c90fee6c9b3bb346a90a7196255e40b132ef,
+        Qx=0x7b861dcd2844a5a8363f6b8ef8d493640f55879217189d80326aad9480dfc149,
+        Qy=0xc4675b45eeb306405f6c33c38bc69eb2bdec9b75ad5af4706aab84543b9cc63a,
+        Z=0x664e45d5bba4ac931cd65d52017e4be9b19a515f669bea4703542a2c525cd3d3,
+    ), dict(
+        ox=0x6a9e0c3f916e4e315c91147be571686d90464e8bf981d34a90b6353bca6eeba7,
+        oy=0x40f9bead39c2f2bcc2602f75b8a73ec7bdffcbcead159d0174c6c4d3c5357f05,
+        d=0x3b589af7db03459c23068b64f63f28d3c3c6bc25b5bf76ac05f35482888b5190,
+        Qx=0x9fb38e2d58ea1baf7622e96720101cae3cde4ba6c1e9fa26d9b1de0899102863,
+        Qy=0xd5561b900406edf50802dd7d73e89395f8aed72fba0e1d1b61fe1d22302260f0,
+        Z=0xca342daa50dc09d61be7c196c85e60a80c5cb04931746820be548cdde055679d,
+    ), dict(
+        ox=0xa9c0acade55c2a73ead1a86fb0a9713223c82475791cd0e210b046412ce224bb,
+        oy=0xf6de0afa20e93e078467c053d241903edad734c6b403ba758c2b5ff04c9d4229,
+        d=0xd8bf929a20ea7436b2461b541a11c80e61d826c0a4c9d322b31dd54e7f58b9c8,
+        Qx=0x20f07631e4a6512a89ad487c4e9d63039e579cb0d7a556cb9e661cd59c1e7fa4,
+        Qy=0x6de91846b3eee8a5ec09c2ab1f41e21bd83620ccdd1bdce3ab7ea6e02dd274f5,
+        Z=0x35aa9b52536a461bfde4e85fc756be928c7de97923f0416c7a3ac8f88b3d4489,
+    ), dict(
+        ox=0x94e94f16a98255fff2b9ac0c9598aac35487b3232d3231bd93b7db7df36f9eb9,
+        oy=0xd8049a43579cfa90b8093a94416cbefbf93386f15b3f6e190b6e3455fedfe69a,
+        d=0x0f9883ba0ef32ee75ded0d8bda39a5146a29f1f2507b3bd458dbea0b2bb05b4d,
+        Qx=0xabb61b423be5d6c26e21c605832c9142dc1dfe5a5fff28726737936e6fbf516d,
+        Qy=0x733d2513ef58beab202090586fac91bf0fee31e80ab33473ab23a2d89e58fad6,
+        Z=0x605c16178a9bc875dcbff54d63fe00df699c03e8a888e9e94dfbab90b25f39b4,
+    ), dict(
+        ox=0xe099bf2a4d557460b5544430bbf6da11004d127cb5d67f64ab07c94fcdf5274f,
+        oy=0xd9c50dbe70d714edb5e221f4e020610eeb6270517e688ca64fb0e98c7ef8c1c5,
+        d=0x2beedb04b05c6988f6a67500bb813faf2cae0d580c9253b6339e4a3337bb6c08,
+        Qx=0x3d63e429cb5fa895a9247129bf4e48e89f35d7b11de8158efeb3e106a2a87395,
+        Qy=0x0cae9e477ef41e7c8c1064379bb7b554ddcbcae79f9814281f1e50f0403c61f3,
+        Z=0xf96e40a1b72840854bb62bc13c40cc2795e373d4e715980b261476835a092e0b,
+    )
+)
+
 # Section 8.1 of RFC 4754
 tv_ecdsa_rfc4754 = dict(
     w=0xDC51D3866A15BACDE33D96F992FCA99DA7E6EF0934E7097559C27F1614C88A7F,
@@ -382,6 +457,21 @@ if __name__ == '__main__':
 
     sr = tv['r'] * gi
     assert(tv['girx'] == int(sr.x()) and tv['giry'] == int(sr.y()))
+
+    print("OK")
+
+    print("P-256 ECDH test vectors from NIST...",
+          end=' ', flush=True)
+
+    for tv in tv_ecdh_nist:
+        Q = tv['d'] * p256.base_point()
+        assert(tv['Qx'] == int(Q.x()) and tv['Qy'] == int(Q.y()))
+
+        ox = ModInt(tv['ox'], p256.p)
+        oy = ModInt(tv['oy'], p256.p)
+        o = CurvePoint((ox, oy), p256)
+        do = tv['d'] * o
+        assert(tv['Z'] == int(do.x()))
 
     print("OK")
 
