@@ -3,7 +3,8 @@
 
 """Generate test data for P-256 and related functions."""
 
-from p256 import (ModInt, p256, ecdsa_modint_from_hash,
+from p256 import (ModInt, p256,
+                  ecdsa_modint_from_hash, EcdsaSigner,
                   tv_ecdsa_rfc6979_key, tv_ecdsa_rfc6979,
                   tv_ecdh_nist)
 
@@ -244,6 +245,13 @@ d = ModInt(tv_ecdsa_rfc6979_key['x'], p256.n)
 # 0 == s == e + rd / k  <=>  e = -rd
 e =  - sigr * d
 c_bytes("h256a_s0", int(e), 32)
+
+com("ECDSA: signature on all-0 hash")
+key = tv_ecdsa_rfc6979_key
+signer = EcdsaSigner(p256, key['x'])
+sig = signer.sign(b"\0" * 32)
+c_pair("sig_h0", sig[0], sig[1])
+c_bytes("h0", 0, 32)
 
 com("ECDH test vectors from NIST")
 for i, tv in enumerate(tv_ecdh_nist):

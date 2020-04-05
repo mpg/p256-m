@@ -1062,6 +1062,8 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
 {
     /*
      * Steps and notations from [SEC1] 4.1.3
+     *
+     * Note: we're using public data only, so branches are OK
      */
     int ret;
 
@@ -1098,20 +1100,26 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     if (ret != 0)
         return ret;
 
-    uint32_t r1x[8], r1y[8], r1z[8];
-    scalar_mult(r1x, r1y, r1z, p256_gx, p256_gy, u1);  /* R1 = u1 * G */
-    point_to_affine(r1x, r1y, r1z);
-
+    uint32_t rx[8], ry[8], rz[8];
     uint32_t r2x[8], r2y[8], r2z[8];
     scalar_mult(r2x, r2y, r2z, px, py, u2);            /* R2 = u2 * Qu */
     point_to_affine(r2x, r2y, r2z);
 
-    uint32_t rx[8], ry[8], rz[8];
-    point_add_or_double_leaky(rx, ry, rz, r1x, r1y, r2x, r2y);  /* R = R1 + R2 */
-    /* We're using public data only so branches are OK */
-    if (u256_diff0(rz) == 0)
-        return -1;
-    point_to_affine(rx, ry, rz);
+    if (u256_diff0(u1) == 0) {
+        /* u1 out of range for scalar_mult() - just skip it */
+        u256_cmov(rx, r2x, 1);
+        /* we don't care about y and z */
+    } else {
+        uint32_t r1x[8], r1y[8], r1z[8];
+        scalar_mult(r1x, r1y, r1z, p256_gx, p256_gy, u1);  /* R1 = u1 * G */
+        point_to_affine(r1x, r1y, r1z);
+
+        /* R = R1 + R2 */
+        point_add_or_double_leaky(rx, ry, rz, r1x, r1y, r2x, r2y);
+        if (u256_diff0(rz) == 0)
+            return -1;
+        point_to_affine(rx, ry, rz);
+    }
 
     /* 6. Convert xR to an integer */
     m256_done(rx, p256_p);

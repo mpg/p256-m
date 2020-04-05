@@ -83,6 +83,7 @@ static void assert_ecdsa_verify(void)
     assert_ecdsa_verify_one(sig256b, h256b, sizeof h256b);
     assert_ecdsa_verify_one(sig384b, h384b, sizeof h384b);
     assert_ecdsa_verify_one(sig512b, h512b, sizeof h512b);
+    assert_ecdsa_verify_one(sig_h0, h0, sizeof h0);
 
     /* r, s out of range */
     const size_t hlen = sizeof h256a;
@@ -123,6 +124,7 @@ static void assert_ecdsa_sign(void)
     assert_ecdsa_sign_one(h256b, sizeof h256b);
     assert_ecdsa_sign_one(h384b, sizeof h384b);
     assert_ecdsa_sign_one(h512b, sizeof h512b);
+    assert_ecdsa_sign_one(h0, sizeof h0);
 
     /* bad priv (out-of-range) */
     uint8_t sig[64];
