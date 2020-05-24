@@ -22,7 +22,7 @@ $(TESTWHITE): test-whitebox.c $(TESTDATA) $(SRC)
 	$(CC) $(CFLAGS) $< -o $@
 
 $(TESTDATA): gen-test-data.py p256.py
-	python $< > $@
+	python3 $< > $@
 
 all: runtest
 	./sizes.sh
