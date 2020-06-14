@@ -99,6 +99,12 @@ static void assert_ecdsa_verify(void)
     assert(0 != p256_ecdsa_verify(sig256a, pub_bad_xm, h256a, hlen));
     assert(0 != p256_ecdsa_verify(sig256a, pub_bad_yp, h256a, hlen));
     assert(0 != p256_ecdsa_verify(sig256a, pub_bad_ym, h256a, hlen));
+
+    /* invalid signature for crafted hash that gives u1 G + u2 Q == 0 */
+    assert(0 != p256_ecdsa_verify(sig256a, ecdsa_pub, h256a_s0, hlen));
+
+    /* invalid signature for crafted hash that gives u1 G == u2 Q */
+    assert(0 != p256_ecdsa_verify(sig256a, ecdsa_pub, h256a_double, hlen));
 }
 
 /* validate sign against verify */

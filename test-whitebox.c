@@ -654,8 +654,6 @@ static void assert_ecdsa_sign(void)
     }
 }
 
-/* TODO: ecdsa verify internal edge case for add_or_double? */
-
 int main(void)
 {
     /* testing the test RNG */
