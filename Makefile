@@ -31,5 +31,7 @@ all: runtest
 clean:
 	rm -f $(TESTBLACK) $(TESTWHITE) $(TESTDATA)
 	rm -f *.s *.o *.dump *.sizes *.su *.dfinish
+	rm -f *.gcda *.gcno *.info *.html
+	rm -rf cov-black cov-white
 
 .PHONY: runtest clean all
