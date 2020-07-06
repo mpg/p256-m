@@ -7,19 +7,20 @@ HDR=p256-m.h
 
 CC=clang
 CFLAGS=-Werror -Weverything --std=c99 -O1
+CFLAGS_SAN=
 
 runtest: $(TESTBLACK) $(TESTWHITE)
 	./$(TESTBLACK)
 	./$(TESTWHITE)
 
 $(TESTLIB): $(SRC) $(HDR)
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $(CFLAGS) $(CFLAGS_SAN) $< -c -o $@
 
 $(TESTBLACK): test-blackbox.c $(TESTLIB) $(TESTDATA) $(HDR)
-	$(CC) $(CFLAGS) $< $(TESTLIB) -o $@
+	$(CC) $(CFLAGS) $(CFLAGS_SAN) $< $(TESTLIB) -o $@
 
 $(TESTWHITE): test-whitebox.c $(TESTDATA) $(SRC)
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $(CFLAGS_SAN) $< -o $@
 
 $(TESTDATA): gen-test-data.py p256.py
 	python3 $< > $@

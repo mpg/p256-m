@@ -4,6 +4,37 @@
 
 #include "p256-m.h"
 
+/*
+ * Helpers to test constant-time behaviour with valgrind or MemSan.
+ *
+ * CT_POISON() is used for secret data. It marks the memory area as
+ * uninitialised, so that any branch or pointer dereference that depends (even
+ * indirectly) on it triggers a warning.
+ * CT_UNPOISON() is used for public data; it marks the area as initialised.
+ *
+ * These are macros in order to avoid interfering with origin tracking.
+ */
+#if defined(CT_MEMSAN)
+
+#include <sanitizer/msan_interface.h>
+#define CT_POISON   __msan_allocated_memory
+// void __msan_allocated_memory(const volatile void* data, size_t size);
+#define CT_UNPOISON __msan_unpoison
+// void __msan_unpoison(const volatile void *a, size_t size);
+
+#elif defined(CT_VALGRIND)
+
+#include <valgrind/memcheck.h>
+#define CT_POISON   VALGRIND_MAKE_MEM_UNDEFINED
+// VALGRIND_MAKE_MEM_UNDEFINED(_qzz_addr,_qzz_len)
+#define CT_UNPOISON VALGRIND_MAKE_MEM_DEFINED
+// VALGRIND_MAKE_MEM_DEFINED(_qzz_addr,_qzz_len)
+
+#else
+#define CT_POISON(p, sz)
+#define CT_UNPOISON(p, sz)
+#endif
+
 /**********************************************************************
  *
  * Operations on fixed-width unsigned integers
@@ -889,10 +920,18 @@ static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
     }
     while (ret != 0);
 
+    /* all representations of the scalar are now secrets */
+    CT_POISON(sbytes, 32);
+    CT_POISON(s, 32);
+
     /* compute and ouput the associated public key */
     uint32_t z[8];
     scalar_mult(x, y, z, p256_gx, p256_gy, s);
     point_to_affine(x, y, z);
+
+    /* the associated public key is not a secret */
+    CT_UNPOISON(x, 32);
+    CT_UNPOISON(y, 32);
 
     return 0;
 }
@@ -927,6 +966,8 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
     ret = scalar_from_bytes(s, priv);
     if (ret != 0)
         return ret;
+    CT_POISON(s, 32);
+    CT_POISON(priv, 32);
 
     ret = point_from_bytes(px, py, peer);
     if (ret != 0)
@@ -936,6 +977,7 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
     point_to_affine(x, y, z);
 
     m256_to_bytes(secret, x, p256_p);
+    CT_UNPOISON(secret, 32);
     return 0;
 }
 
@@ -1033,6 +1075,8 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
         return ret;
     if (u256_diff0(du) == 0)
         return -1;
+    CT_POISON(du, 32);
+    CT_POISON(priv, 32);
 
     uint32_t s[8];
     m256_inv(s, k, p256_n);         /* s = k^-1 */
@@ -1042,6 +1086,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
 
     /* 7. Output s (r already outputed at step 3) */
 
+    CT_UNPOISON(s, 32);
     /* s is public data so it's OK to use a branch */
     if (u256_diff0(s) == 0) {
         /* undo early output of xr */
