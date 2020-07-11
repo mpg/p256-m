@@ -249,10 +249,14 @@ static void u256_to_bytes(uint8_t p[32], const uint32_t z[8])
  *
  * Inversion is computed using Fermat's little theorem.
  *
- * Montgomery operations require that m is odd,
- * and Fermat's little theorem require it to be a prime.
+ * Assumptions of m:
+ * - Montgomery operations require that m is odd.
+ * - Fermat's little theorem require it to be a prime.
+ * - m256_inv() further requires that m % 2^32 >= 2.
+ * - m256_inv() also assumes that the value of m is not a secret.
+ *
  * In practice operations are done modulo the curve's p and n,
- * both of which are large primes.
+ * both of which satisfy those assumptions.
  *
  **********************************************************************/
 
@@ -428,6 +432,7 @@ static void m256_set32(uint32_t z[8], uint32_t x, const m256_mod *mod)
  *
  * in: x in [0, m)
  *     mod must point to a valid m256_mod structure
+ *     such that mod->m % 2^32 >= 2, assumed to be public.
  * out: z = = x^-1 * 2^512 mod m
  * That is, if x = x_actual    * 2^256 mod m, then
  *             z = x_actual^-1 * 2^256 mod m
@@ -441,7 +446,7 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
      * Use Fermat's little theorem to compute x^-1 as x^(m-2).
      *
      * Take advantage of the fact that both p's and n's least significant limb
-     * is greater that 2 to perform the subtraction on the flight (no carry).
+     * is at least 2 to perform the subtraction on the flight (no carry).
      *
      * Use plain right-to-left binary exponentiation;
      * branches are OK as the exponent is not a secret.
