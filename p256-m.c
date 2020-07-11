@@ -257,65 +257,65 @@ static void u256_to_bytes(uint8_t p[32], const uint32_t z[8])
  **********************************************************************/
 
 /*
- * Primes associated to the curve, modulo which we'll compute
+ * Data associated to a modulus for Montgomery operations.
+ *
+ * m in [0, 2^256) - the modulus itself, must be odd
+ * R2 = 2^512 mod m
+ * ni = -m^-1 mod 2^32
  */
-static const uint32_t p256_p[8] = {     /* the curve's p */
-    0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
-    0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
-};
+typedef struct {
+    uint32_t m[8];
+    uint32_t R2[8];
+    uint32_t ni;
+}
+m256_mod;
 
-static const uint32_t p256_n[8] = {     /* the curve's n */
-    0xFC632551, 0xF3B9CAC2, 0xA7179E84, 0xBCE6FAAD,
-    0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
+/*
+ * Data for Montgomery operations modulo the curve's p
+ */
+static const m256_mod p256_p = {
+    {   /* the curve's p */
+        0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0x00000000,
+        0x00000000, 0x00000000, 0x00000001, 0xFFFFFFFF,
+    },
+    {   /* 2^512 mod p */
+        0x00000003, 0x00000000, 0xffffffff, 0xfffffffb,
+        0xfffffffe, 0xffffffff, 0xfffffffd, 0x00000004,
+    },
+    0x00000001, /* -p^-1 mod 2^32 */
 };
 
 /*
- * Montgomery constants associated to the above primes
- *
- * Order them in a tables with:
- *  the value associated to p in position 1,
- *  the value associated to n in position 0.
- *
- * This is a trick to allow selecting the proper value given m = p or n
- * by using m[6] as the index in this table (see values or p and n above).
+ * Data for Montgomery operations modulo the curve's p
  */
-static inline uint32_t m256_mont_idx(const uint32_t m[8])
-{
-    return m[6];        /* conveniently happens to be 0 for n, 1 for p */
-}
-
-static const uint32_t m256_mont_ni[2] = {       /* negative inverses or n and p */
-    0xee00bc4f, /* -n^-1 mod 32 */
-    0x00000001, /* -p^-1 mod 32 */
-};
-
-static const uint32_t m256_mont_R2[2][8] = {    /* R^2 mod n and p, with R = 2^256 */
+static const m256_mod p256_n = {
+    {   /* the curve's n */
+        0xFC632551, 0xF3B9CAC2, 0xA7179E84, 0xBCE6FAAD,
+        0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0xFFFFFFFF,
+    },
     {   /* 2^512 mod n */
-     0xbe79eea2, 0x83244c95, 0x49bd6fa6, 0x4699799c,
-     0x2b6bec59, 0x2845b239, 0xf3d95620, 0x66e12d94,
-      },
-    {   /* 2^512 mod p */
-     0x00000003, 0x00000000, 0xffffffff, 0xfffffffb,
-     0xfffffffe, 0xffffffff, 0xfffffffd, 0x00000004,
-      },
+        0xbe79eea2, 0x83244c95, 0x49bd6fa6, 0x4699799c,
+        0x2b6bec59, 0x2845b239, 0xf3d95620, 0x66e12d94,
+    },
+    0xee00bc4f, /* -n^-1 mod 2^32 */
 };
 
 /*
  * Modular addition
  *
  * in: x, y in [0, m)
- *     m in [0, 2^256)
+ *     mod must point to a valid m256_mod structure
  * out: z = (x + y) mod m, in [0, m)
  *
  * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
 static void m256_add(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
-                     const uint32_t m[8])
+                     const m256_mod *mod)
 {
     uint32_t r[8];
     uint32_t carry_add = u256_add(z, x, y);
-    uint32_t carry_sub = u256_sub(r, z, m);
+    uint32_t carry_sub = u256_sub(r, z, mod->m);
     /* Need to subract m if:
      *      x+y >= 2^256 > m (that is, carry_add == 1)
      *   OR z >= m (that is, carry_sub == 0) */
@@ -327,18 +327,18 @@ static void m256_add(uint32_t z[8],
  * Modular subtraction
  *
  * in: x, y in [0, m)
- *     m in [0, 2^256)
+ *     mod must point to a valid m256_mod structure
  * out: z = (x - y) mod m, in [0, m)
  *
  * Note: as a memory area, z must be either equal to x or y, or not overlap.
  */
 static void m256_sub(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
-                     const uint32_t m[8])
+                     const m256_mod *mod)
 {
     uint32_t r[8];
     uint32_t carry = u256_sub(z, x, y);
-    (void) u256_add(r, z, m);
+    (void) u256_add(r, z, mod->m);
     /* Need to add m if and only if x < y, that is carry == 1.
      * In that case z is in [2^256 - m + 1, 2^256 - 1], so the
      * addition will have a carry as well, which cancels out. */
@@ -349,20 +349,20 @@ static void m256_sub(uint32_t z[8],
  * Montgomery modular multiplication
  *
  * in: x, y in [0, m)
- *     m must be either p256_p or p256_n
+ *     mod must point to a valid m256_mod structure
  * out: z = (x * y) / 2^256 mod m, in [0, m)
  *
  * Note: as a memory area, z may overlap with x or y.
  */
 static void m256_mul(uint32_t z[8],
                      const uint32_t x[8], const uint32_t y[8],
-                     const uint32_t m[8])
+                     const m256_mod *mod)
 {
     /*
      * Algorithm 14.36 in Handbook of Applied Cryptography with:
      * b = 2^32, n = 8, R = 2^256
      */
-    uint32_t m_prime = m256_mont_ni[m256_mont_idx(m)];
+    uint32_t m_prime = mod->ni;
     uint32_t a[9] = { 0 };
 
     for (unsigned i = 0; i < 8; i++) {
@@ -371,13 +371,13 @@ static void m256_mul(uint32_t z[8],
 
         /* a = (a + x[i] * y + u * m) div b */
         uint32_t c = u288_muladd(a, x[i], y);
-        c += u288_muladd(a, u, m);
+        c += u288_muladd(a, u, mod->m);
         u288_rshift32(a, c);
     }
 
     /* a = a > m ? a - m : a */
     uint32_t carry_add = a[8];  // 0 or 1 since a < 2m, see HAC Note 14.37
-    uint32_t carry_sub = u256_sub(z, a, m);
+    uint32_t carry_sub = u256_sub(z, a, mod->m);
     uint32_t use_sub = carry_add | (1 - carry_sub);     // see m256_add()
     u256_cmov(z, a, 1 - use_sub);
 }
@@ -386,50 +386,48 @@ static void m256_mul(uint32_t z[8],
  * In-place conversion to Montgomery form
  *
  * in: z in [0, m)
- *     m must be either p256_p or p256_n
+ *     mod must point to a valid m256_mod structure
  * out: z_out = z_in * 2^256 mod m, in [0, m)
  */
-static void m256_prep(uint32_t z[8], const uint32_t m[8])
+static void m256_prep(uint32_t z[8], const m256_mod *mod)
 {
-    const uint32_t *R2m = m256_mont_R2[m256_mont_idx(m)];
-
-    m256_mul(z, z, R2m, m);
+    m256_mul(z, z, mod->R2, mod);
 }
 
 /*
  * In-place conversion from Montgomery form
  *
  * in: z in [0, m)
- *     m must be either p256_p or p256_n
+ *     mod must point to a valid m256_mod structure
  * out: z_out = z_in / 2^256 mod m, in [0, m)
  * That is, z_in was z_actual * 2^256 mod m, and z_out is z_actual
  */
-static void m256_done(uint32_t z[8], const uint32_t m[8])
+static void m256_done(uint32_t z[8], const m256_mod *mod)
 {
     uint32_t one[8];
     u256_set32(one, 1);
-    m256_mul(z, z, one, m);
+    m256_mul(z, z, one, mod);
 }
 
 /*
  * Set to 32-bit value
  *
  * in: x in [0, 2^32)
- *     m must be either p256_p or p256_n
+ *     mod must point to a valid m256_mod structure
  * out: z = x * 2^256 mod m, in [0, m)
  * That is, z is set to the image of x in the Montgomery domain.
  */
-static void m256_set32(uint32_t z[8], uint32_t x, const uint32_t m[8])
+static void m256_set32(uint32_t z[8], uint32_t x, const m256_mod *mod)
 {
     u256_set32(z, x);
-    m256_prep(z, m);
+    m256_prep(z, mod);
 }
 
 /*
  * Modular inversion in Montgomery form
  *
  * in: x in [0, m)
- *     m must be either p256_p or p256_n
+ *     mod must point to a valid m256_mod structure
  * out: z = = x^-1 * 2^512 mod m
  * That is, if x = x_actual    * 2^256 mod m, then
  *             z = x_actual^-1 * 2^256 mod m
@@ -437,7 +435,7 @@ static void m256_set32(uint32_t z[8], uint32_t x, const uint32_t m[8])
  * Note: as a memory area, z may overlap with x or y.
  */
 static void m256_inv(uint32_t z[8], const uint32_t x[8],
-                     const uint32_t m[8])
+                     const m256_mod *mod)
 {
     /*
      * Use Fermat's little theorem to compute x^-1 as x^(m-2).
@@ -451,16 +449,16 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
     uint32_t bitval[8];
     u256_cmov(bitval, x, 1);    /* copy x before writing to z */
 
-    m256_set32(z, 1, m);
+    m256_set32(z, 1, mod);
 
     unsigned i = 0;
-    uint32_t limb = m[i] - 2;
+    uint32_t limb = mod->m[i] - 2;
     while (1) {
         for (unsigned j = 0; j < 32; j++) {
             if ((limb & 1) != 0) {
-                m256_mul(z, z, bitval, m);
+                m256_mul(z, z, bitval, mod);
             }
-            m256_mul(bitval, bitval, bitval, m);
+            m256_mul(bitval, bitval, bitval, mod);
             limb >>= 1;
         }
 
@@ -468,7 +466,7 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
             break;
 
         i++;
-        limb = m[i];
+        limb = mod->m[i];
     }
 }
 
@@ -476,22 +474,22 @@ static void m256_inv(uint32_t z[8], const uint32_t x[8],
  * Import modular integer from bytes to Montgomery domain
  *
  * in: p = p0, ..., p32
- *     m must be either p256_p or p256_n
+ *     mod must point to a valid m256_mod structure
  * out: z = (p0 * 2^248 + ... + p31) * 2^256 mod m, in [0, m)
  *      return 0 if the number was already in [0, m), or -1.
  *      z may be incorrect and must be discared when -1 is returned.
  */
 static int m256_from_bytes(uint32_t z[8],
-                           const uint8_t p[32], const uint32_t m[8])
+                           const uint8_t p[32], const m256_mod *mod)
 {
     u256_from_bytes(z, p);
 
     uint32_t t[8];
-    uint32_t lt_m = u256_sub(t, z, m);
+    uint32_t lt_m = u256_sub(t, z, mod->m);
     if (lt_m != 1)
         return -1;
 
-    m256_prep(z, m);
+    m256_prep(z, mod);
     return 0;
 }
 
@@ -499,15 +497,16 @@ static int m256_from_bytes(uint32_t z[8],
  * Export modular integer from Montgomery domain to bytes
  *
  * in: z in [0, 2^256)
+ *     mod must point to a valid m256_mod structure
  * out: p = p0, ..., p31 such that
  *      z = (p0 * 2^248 + ... + p31) * 2^256 mod m
  */
 static void m256_to_bytes(uint8_t p[32],
-                          const uint32_t z[8], const uint32_t m[8])
+                          const uint32_t z[8], const m256_mod *mod)
 {
     uint32_t zi[8];
     u256_cmov(zi, z, 1);
-    m256_done(zi, m);
+    m256_done(zi, mod);
 
     u256_to_bytes(p, zi);
 }
@@ -574,14 +573,14 @@ static uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
     uint32_t lhs[8], rhs[8];
 
     /* lhs = y^2 */
-    m256_mul(lhs, y, y, p256_p);
+    m256_mul(lhs, y, y, &p256_p);
 
     /* rhs = x^3 - 3x + b */
-    m256_mul(rhs, x,   x, p256_p);      /* x^2 */
-    m256_mul(rhs, rhs, x, p256_p);      /* x^3 */
+    m256_mul(rhs, x,   x, &p256_p);      /* x^2 */
+    m256_mul(rhs, rhs, x, &p256_p);      /* x^3 */
     for (unsigned i = 0; i < 3; i++)
-        m256_sub(rhs, rhs, x, p256_p);  /* x^3 - 3x */
-    m256_add(rhs, rhs, p256_b, p256_p); /* x^3 - 3x + b */
+        m256_sub(rhs, rhs, x, &p256_p);  /* x^3 - 3x */
+    m256_add(rhs, rhs, p256_b, &p256_p); /* x^3 - 3x + b */
 
     return u256_diff(lhs, rhs);
 }
@@ -598,13 +597,13 @@ static void point_to_affine(uint32_t x[8], uint32_t y[8], uint32_t z[8])
 {
     uint32_t t[8];
 
-    m256_inv(z, z, p256_p);     /* z = z^-1 */
+    m256_inv(z, z, &p256_p);     /* z = z^-1 */
 
-    m256_mul(t, z, z, p256_p);  /* t = z^-2 */
-    m256_mul(x, x, t, p256_p);  /* x = x * z^-2 */
+    m256_mul(t, z, z, &p256_p);  /* t = z^-2 */
+    m256_mul(x, x, t, &p256_p);  /* x = x * z^-2 */
 
-    m256_mul(t, t, z, p256_p);  /* t = z^-3 */
-    m256_mul(y, y, t, p256_p);  /* y = y * z^-3 */
+    m256_mul(t, t, z, &p256_p);  /* t = z^-3 */
+    m256_mul(y, y, t, &p256_p);  /* y = y * z^-3 */
 }
 
 /*
@@ -622,36 +621,36 @@ static void point_double(uint32_t x[8], uint32_t y[8], uint32_t z[8])
     uint32_t m[8], s[8], u[8];
 
     /* m = 3 * x^2 + a * z^4 = 3 * (x + z^2) * (x - z^2) */
-    m256_mul(s, z, z, p256_p);
-    m256_add(m, x, s, p256_p);
-    m256_sub(u, x, s, p256_p);
-    m256_mul(s, m, u, p256_p);
-    m256_add(m, s, s, p256_p);
-    m256_add(m, m, s, p256_p);
+    m256_mul(s, z, z, &p256_p);
+    m256_add(m, x, s, &p256_p);
+    m256_sub(u, x, s, &p256_p);
+    m256_mul(s, m, u, &p256_p);
+    m256_add(m, s, s, &p256_p);
+    m256_add(m, m, s, &p256_p);
 
     /* s = 4 * x * y^2 */
-    m256_mul(u, y, y, p256_p);
-    m256_add(u, u, u, p256_p); /* u = 2 * y^2 (used below) */
-    m256_mul(s, x, u, p256_p);
-    m256_add(s, s, s, p256_p);
+    m256_mul(u, y, y, &p256_p);
+    m256_add(u, u, u, &p256_p); /* u = 2 * y^2 (used below) */
+    m256_mul(s, x, u, &p256_p);
+    m256_add(s, s, s, &p256_p);
 
     /* u = 8 * y^4 (not named in the paper, first term of y3) */
-    m256_mul(u, u, u, p256_p);
-    m256_add(u, u, u, p256_p);
+    m256_mul(u, u, u, &p256_p);
+    m256_add(u, u, u, &p256_p);
 
     /* x3 = t = m^2 - 2 * s */
-    m256_mul(x, m, m, p256_p);
-    m256_sub(x, x, s, p256_p);
-    m256_sub(x, x, s, p256_p);
+    m256_mul(x, m, m, &p256_p);
+    m256_sub(x, x, s, &p256_p);
+    m256_sub(x, x, s, &p256_p);
 
     /* z3 = 2 * y * z */
-    m256_mul(z, y, z, p256_p);
-    m256_add(z, z, z, p256_p);
+    m256_mul(z, y, z, &p256_p);
+    m256_add(z, z, z, &p256_p);
 
     /* y3 = -u + m * (s - t) */
-    m256_sub(y, s, x, p256_p);
-    m256_mul(y, y, m, p256_p);
-    m256_sub(y, y, u, p256_p);
+    m256_sub(y, s, x, &p256_p);
+    m256_mul(y, y, m, &p256_p);
+    m256_sub(y, y, u, &p256_p);
 }
 
 /*
@@ -673,40 +672,40 @@ static void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
     /* u1 = x1 and s1 = y1 (no computations) */
 
     /* t1 = u2 = x2 z1^2 */
-    m256_mul(t1, z1, z1, p256_p);
-    m256_mul(t2, t1, z1, p256_p);
-    m256_mul(t1, t1, x2, p256_p);
+    m256_mul(t1, z1, z1, &p256_p);
+    m256_mul(t2, t1, z1, &p256_p);
+    m256_mul(t1, t1, x2, &p256_p);
 
     /* t2 = s2 = y2 z1^3 */
-    m256_mul(t2, t2, y2, p256_p);
+    m256_mul(t2, t2, y2, &p256_p);
 
     /* t1 = h = u2 - u1 */
-    m256_sub(t1, t1, x1, p256_p); /* t1 = x2 * z1^2 - x1 */
+    m256_sub(t1, t1, x1, &p256_p); /* t1 = x2 * z1^2 - x1 */
 
     /* t2 = r = s2 - s1 */
-    m256_sub(t2, t2, y1, p256_p);
+    m256_sub(t2, t2, y1, &p256_p);
 
     /* z3 = z1 * h */
-    m256_mul(z1, z1, t1, p256_p);
+    m256_mul(z1, z1, t1, &p256_p);
 
     /* t1 = h^3 */
-    m256_mul(t3, t1, t1, p256_p);
-    m256_mul(t1, t3, t1, p256_p);
+    m256_mul(t3, t1, t1, &p256_p);
+    m256_mul(t1, t3, t1, &p256_p);
 
     /* t3 = x1 * h^2 */
-    m256_mul(t3, t3, x1, p256_p);
+    m256_mul(t3, t3, x1, &p256_p);
 
     /* x3 = r^2 - 2 * x1 * h^2 - h^3 */
-    m256_mul(x1, t2, t2, p256_p);
-    m256_sub(x1, x1, t3, p256_p);
-    m256_sub(x1, x1, t3, p256_p);
-    m256_sub(x1, x1, t1, p256_p);
+    m256_mul(x1, t2, t2, &p256_p);
+    m256_sub(x1, x1, t3, &p256_p);
+    m256_sub(x1, x1, t3, &p256_p);
+    m256_sub(x1, x1, t1, &p256_p);
 
     /* y3 = r * (x1 * h^2 - x3) - y1 h^3 */
-    m256_sub(t3, t3, x1, p256_p);
-    m256_mul(t3, t3, t2, p256_p);
-    m256_mul(t1, t1, y1, p256_p);
-    m256_sub(y1, t3, t1, p256_p);
+    m256_sub(t3, t3, x1, &p256_p);
+    m256_mul(t3, t3, t2, &p256_p);
+    m256_mul(t1, t1, y1, &p256_p);
+    m256_sub(y1, t3, t1, &p256_p);
 }
 
 /*
@@ -729,20 +728,20 @@ static void point_add_or_double_leaky(
         // P != +- Q -> generic addition
         u256_cmov(x3, x1, 1);
         u256_cmov(y3, y1, 1);
-        m256_set32(z3, 1, p256_p);
+        m256_set32(z3, 1, &p256_p);
         point_add(x3, y3, z3, x2, y2);
     }
     else if (u256_diff(y1, y2) == 0) {
         // P == Q -> double
         u256_cmov(x3, x1, 1);
         u256_cmov(y3, y1, 1);
-        m256_set32(z3, 1, p256_p);
+        m256_set32(z3, 1, &p256_p);
         point_double(x3, y3, z3);
     } else {
         // P == -Q -> zero
-        m256_set32(x3, 1, p256_p);
-        m256_set32(y3, 1, p256_p);
-        m256_set32(z3, 0, p256_p);
+        m256_set32(x3, 1, &p256_p);
+        m256_set32(y3, 1, &p256_p);
+        m256_set32(z3, 0, &p256_p);
     }
 }
 
@@ -759,11 +758,11 @@ static int point_from_bytes(uint32_t x[8], uint32_t y[8], const uint8_t p[64])
 {
     int ret;
 
-    ret = m256_from_bytes(x, p, p256_p);
+    ret = m256_from_bytes(x, p, &p256_p);
     if (ret != 0)
         return ret;
 
-    ret = m256_from_bytes(y, p + 32, p256_p);
+    ret = m256_from_bytes(y, p + 32, &p256_p);
     if (ret != 0)
         return ret;
 
@@ -779,8 +778,8 @@ static int point_from_bytes(uint32_t x[8], uint32_t y[8], const uint8_t p[64])
 static void point_to_bytes(uint8_t p[64],
                            const uint32_t x[8], const uint32_t y[8])
 {
-    m256_to_bytes(p,        x, p256_p);
-    m256_to_bytes(p + 32,   y, p256_p);
+    m256_to_bytes(p,        x, &p256_p);
+    m256_to_bytes(p + 32,   y, &p256_p);
 }
 
 /**********************************************************************
@@ -816,18 +815,18 @@ static void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
      *
      * Either way, we can compute s * P as s_odd * P'.
      */
-    u256_sub(s_odd, p256_n, s); /* no carry, result still in [1, n-1] */
+    u256_sub(s_odd, p256_n.m, s); /* no carry, result still in [1, n-1] */
     uint32_t negate = ~s[0] & 1;
     u256_cmov(s_odd, s, 1 - negate);
 
     /* Compute py_neg = - py mod p (that's the y coordinate of -P) */
     u256_set32(py_use, 0);
-    m256_sub(py_neg, py_use, py, p256_p);
+    m256_sub(py_neg, py_use, py, &p256_p);
 
     /* Initialize R = P' = (x:(-1)^negate * y:1) */
     u256_cmov(rx, px, 1);
     u256_cmov(ry, py, 1);
-    m256_set32(rz, 1, p256_p);
+    m256_set32(rz, 1, &p256_p);
     u256_cmov(ry, py_neg, negate);
 
     /*
@@ -882,7 +881,7 @@ static int scalar_from_bytes(uint32_t s[8], const uint8_t p[32])
     u256_from_bytes(s, p);
 
     uint32_t r[8];
-    uint32_t lt_n = u256_sub(r, s, p256_n);
+    uint32_t lt_n = u256_sub(r, s, p256_n.m);
 
     u256_set32(r, 1);
     uint32_t lt_1 = u256_sub(r, s, r);
@@ -976,7 +975,7 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
     scalar_mult(x, y, z, px, py, s);
     point_to_affine(x, y, z);
 
-    m256_to_bytes(secret, x, p256_p);
+    m256_to_bytes(secret, x, &p256_p);
     CT_UNPOISON(secret, 32);
     return 0;
 }
@@ -1017,11 +1016,11 @@ static void ecdsa_m256_from_hash(uint32_t z[8],
 
     /* ensure the result is in [0, n) */
     uint32_t t[8];
-    uint32_t c = u256_sub(t, z, p256_n);
+    uint32_t c = u256_sub(t, z, p256_n.m);
     u256_cmov(z, t, 1 - c);
 
     /* map to Montgomery domain */
-    m256_prep(z, p256_n);
+    m256_prep(z, &p256_n);
 }
 
 /*
@@ -1044,13 +1043,13 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     ret = scalar_gen_with_pub(kb, k, xr, yr);
     if (ret != 0)
         return ret;
-    m256_prep(k, p256_n);
+    m256_prep(k, &p256_n);
 
     /* 2. Convert xr to an integer */
-    m256_done(xr, p256_p);
+    m256_done(xr, &p256_p);
 
     /* 3. Reduce xr mod n (extra: output it while at it) */
-    uint32_t c = u256_sub(yr, xr, p256_n);
+    uint32_t c = u256_sub(yr, xr, p256_n.m);
     u256_cmov(xr, yr, 1 - c);
 
     /* xr is public data so it's OK to use a branch */
@@ -1059,7 +1058,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
 
     u256_to_bytes(sig, xr);
 
-    m256_prep(xr, p256_n);
+    m256_prep(xr, &p256_n);
 
     /* 4. Skipped - we take the hash as an input, not the message */
 
@@ -1069,7 +1068,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
 
     /* 6. Compute s = k^-1 * (e + r * dU) */
     uint32_t du[8];
-    ret = m256_from_bytes(du, priv, p256_n);
+    ret = m256_from_bytes(du, priv, &p256_n);
     /* Just validating input, so branches are OK */
     if (ret != 0)
         return ret;
@@ -1079,10 +1078,10 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     CT_POISON(priv, 32);
 
     uint32_t s[8];
-    m256_inv(s, k, p256_n);         /* s = k^-1 */
-    m256_mul(yr, xr, du, p256_n);   /* yr = r * dU */
-    m256_add(yr, e, yr, p256_n);    /* yr = e + r * dU */
-    m256_mul(s, s, yr, p256_n);     /* s = k^-1 * (e + r * dU) */
+    m256_inv(s, k, &p256_n);         /* s = k^-1 */
+    m256_mul(yr, xr, du, &p256_n);   /* yr = r * dU */
+    m256_add(yr, e, yr, &p256_n);    /* yr = e + r * dU */
+    m256_mul(s, s, yr, &p256_n);     /* s = k^-1 * (e + r * dU) */
 
     /* 7. Output s (r already outputed at step 3) */
 
@@ -1094,7 +1093,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
         return -1;
     }
 
-    m256_to_bytes(sig + 32, s, p256_n);
+    m256_to_bytes(sig + 32, s, &p256_n);
 
     return 0;
 }
@@ -1129,15 +1128,15 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
 
     /* 4. Compute u1 and u2 */
     uint32_t u1[8], u2[8];
-    m256_prep(s, p256_n);           /* s in Montgomery domain */
-    m256_inv(s, s, p256_n);         /* s = s^-1 mod n */
-    m256_mul(u1, e, s, p256_n);     /* u1 = e * s^-1 mod n */
-    m256_done(u1, p256_n);          /* u1 out of Montgomery domain */
+    m256_prep(s, &p256_n);           /* s in Montgomery domain */
+    m256_inv(s, s, &p256_n);         /* s = s^-1 mod n */
+    m256_mul(u1, e, s, &p256_n);     /* u1 = e * s^-1 mod n */
+    m256_done(u1, &p256_n);          /* u1 out of Montgomery domain */
 
     u256_cmov(u2, r, 1);
-    m256_prep(u2, p256_n);          /* r in Montgomery domain */
-    m256_mul(u2, u2, s, p256_n);    /* u2 = r * s^-1 mod n */
-    m256_done(u2, p256_n);          /* u2 out of Montgomery domain */
+    m256_prep(u2, &p256_n);          /* r in Montgomery domain */
+    m256_mul(u2, u2, s, &p256_n);    /* u2 = r * s^-1 mod n */
+    m256_done(u2, &p256_n);          /* u2 out of Montgomery domain */
 
     /* 5. Compute R */
     uint32_t px[8], py[8];
@@ -1167,10 +1166,10 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     }
 
     /* 6. Convert xR to an integer */
-    m256_done(rx, p256_p);
+    m256_done(rx, &p256_p);
 
     /* 7. Reduce xR mod n */
-    uint32_t c = u256_sub(ry, rx, p256_n);
+    uint32_t c = u256_sub(ry, rx, p256_n.m);
     u256_cmov(rx, ry, 1 - c);
 
     /* 8. Compare xR mod n to r */

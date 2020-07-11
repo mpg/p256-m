@@ -57,15 +57,15 @@ static void assert_madd()
     uint32_t z[8];
 
     /* x + y < p */
-    m256_add(z, p256_n, word, p256_p);
+    m256_add(z, p256_n.m, word, &p256_p);
     assert(memcmp(z, npwmp, sizeof z) == 0);
 
     /* p <= x + y < 2^256 */
-    m256_add(z, p256_n, b128, p256_p);
+    m256_add(z, p256_n.m, b128, &p256_p);
     assert(memcmp(z, npbmp, sizeof z) == 0);
 
     /* x + y >= 2^256 */
-    m256_add(z, p256_n, p256_n, p256_p);
+    m256_add(z, p256_n.m, p256_n.m, &p256_p);
     assert(memcmp(z, npnmp, sizeof z) == 0);
 }
 
@@ -74,19 +74,19 @@ static void assert_msub()
     uint32_t z[8];
 
     /* x > y */
-    m256_sub(z, one, zero, p256_p);
+    m256_sub(z, one, zero, &p256_p);
     assert(memcmp(z, one, sizeof z) == 0);
 
     /* x == y */
-    m256_sub(z, one, one, p256_p);
+    m256_sub(z, one, one, &p256_p);
     assert(memcmp(z, zero, sizeof z) == 0);
 
     /* x < y by few */
-    m256_sub(z, zero, one, p256_p);
+    m256_sub(z, zero, one, &p256_p);
     assert(memcmp(z, pm1, sizeof z) == 0);
 
     /* x < y by far */
-    m256_sub(z, zero, pm1, p256_p);
+    m256_sub(z, zero, pm1, &p256_p);
     assert(memcmp(z, one, sizeof z) == 0);
 }
 
@@ -94,10 +94,10 @@ static void assert_mmul(void)
 {
     uint32_t z[8];
 
-    m256_mul(z, r, s, p256_p);
+    m256_mul(z, r, s, &p256_p);
     assert(memcmp(z, rsRip, sizeof z) == 0);
 
-    m256_mul(z, r, s, p256_n);
+    m256_mul(z, r, s, &p256_n);
     assert(memcmp(z, rsRin, sizeof z) == 0);
 }
 
@@ -109,12 +109,12 @@ static void assert_prep_mul_done(void)
     memcpy(rm, r, sizeof rm);
     memcpy(sm, s, sizeof rm);
 
-    m256_prep(rm, p256_p);
-    m256_prep(sm, p256_p);
+    m256_prep(rm, &p256_p);
+    m256_prep(sm, &p256_p);
 
-    m256_mul(z, rm, sm, p256_p);
+    m256_mul(z, rm, sm, &p256_p);
 
-    m256_done(z, p256_p);
+    m256_done(z, &p256_p);
 
     assert(memcmp(z, rtsmp, sizeof z) == 0);
 
@@ -122,12 +122,12 @@ static void assert_prep_mul_done(void)
     memcpy(rm, r, sizeof rm);
     memcpy(sm, s, sizeof rm);
 
-    m256_prep(rm, p256_n);
-    m256_prep(sm, p256_n);
+    m256_prep(rm, &p256_n);
+    m256_prep(sm, &p256_n);
 
-    m256_mul(z, rm, sm, p256_n);
+    m256_mul(z, rm, sm, &p256_n);
 
-    m256_done(z, p256_n);
+    m256_done(z, &p256_n);
 
     assert(memcmp(z, rtsmn, sizeof z) == 0);
 }
@@ -137,15 +137,15 @@ static void assert_inv(void)
     uint32_t rm[8], z[8];
 
     memcpy(rm, r, sizeof rm);
-    m256_prep(rm, p256_p);
-    m256_inv(z, rm, p256_p);
-    m256_done(z, p256_p);
+    m256_prep(rm, &p256_p);
+    m256_inv(z, rm, &p256_p);
+    m256_done(z, &p256_p);
     assert(memcmp(z, rip, sizeof z) == 0);
 
     memcpy(rm, r, sizeof rm);
-    m256_prep(rm, p256_n);
-    m256_inv(z, rm, p256_n);
-    m256_done(z, p256_n);
+    m256_prep(rm, &p256_n);
+    m256_inv(z, rm, &p256_n);
+    m256_done(z, &p256_n);
     assert(memcmp(z, rin, sizeof z) == 0);
 }
 
@@ -156,28 +156,28 @@ static void assert_mbytes()
     uint8_t p[32];
 
     /* mod p */
-    ret = m256_from_bytes(z, rbytes, p256_p);
+    ret = m256_from_bytes(z, rbytes, &p256_p);
     assert(ret == 0);
     assert(memcmp(z, rmontp, sizeof z) == 0);
 
-    m256_to_bytes(p, z, p256_p);
+    m256_to_bytes(p, z, &p256_p);
     assert(memcmp(p, rbytes, sizeof p) == 0);
 
     /* mod n */
-    ret = m256_from_bytes(z, rbytes, p256_n);
+    ret = m256_from_bytes(z, rbytes, &p256_n);
     assert(ret == 0);
     assert(memcmp(z, rmontn, sizeof z) == 0);
 
-    m256_to_bytes(p, z, p256_n);
+    m256_to_bytes(p, z, &p256_n);
     assert(memcmp(p, rbytes, sizeof p) == 0);
 
     /* too large by one, mod p and n */
-    u256_to_bytes(p, p256_p);
-    ret = m256_from_bytes(z, p, p256_p);
+    u256_to_bytes(p, p256_p.m);
+    ret = m256_from_bytes(z, p, &p256_p);
     assert(ret == -1);
 
-    u256_to_bytes(p, p256_n);
-    ret = m256_from_bytes(z, p, p256_n);
+    u256_to_bytes(p, p256_n.m);
+    ret = m256_from_bytes(z, p, &p256_n);
     assert(ret == -1);
 }
 
@@ -186,15 +186,15 @@ static void assert_pt_params(void)
     uint32_t z[8];
 
     u256_cmov(z, p256_b, 1);
-    m256_done(z, p256_p);
+    m256_done(z, &p256_p);
     assert(memcmp(z, b_raw, sizeof z) == 0);
 
     u256_cmov(z, p256_gx, 1);
-    m256_done(z, p256_p);
+    m256_done(z, &p256_p);
     assert(memcmp(z, gx_raw, sizeof z) == 0);
 
     u256_cmov(z, p256_gy, 1);
-    m256_done(z, p256_p);
+    m256_done(z, &p256_p);
     assert(memcmp(z, gy_raw, sizeof z) == 0);
 }
 
@@ -232,8 +232,8 @@ static void assert_pt_double(void)
     point_double(dx, dy, dz);
 
     point_to_affine(dx, dy, dz);
-    m256_done(dx, p256_p);
-    m256_done(dy, p256_p);
+    m256_done(dx, &p256_p);
+    m256_done(dy, &p256_p);
 
     assert(memcmp(dx, g2x, sizeof dx) == 0);
     assert(memcmp(dy, g2y, sizeof dy) == 0);
@@ -245,8 +245,8 @@ static void assert_pt_add(void)
 
     u256_cmov(mg2x, g2x, 1);
     u256_cmov(mg2y, g2y, 1);
-    m256_prep(mg2x, p256_p);
-    m256_prep(mg2y, p256_p);
+    m256_prep(mg2x, &p256_p);
+    m256_prep(mg2y, &p256_p);
 
     u256_cmov(tx, jac_gx, 1);
     u256_cmov(ty, jac_gy, 1);
@@ -255,8 +255,8 @@ static void assert_pt_add(void)
     point_add(tx, ty, tz, mg2x, mg2y);
 
     point_to_affine(tx, ty, tz);
-    m256_done(tx, p256_p);
-    m256_done(ty, p256_p);
+    m256_done(tx, &p256_p);
+    m256_done(ty, &p256_p);
 
     assert(memcmp(tx, g3x, sizeof tx) == 0);
     assert(memcmp(ty, g3y, sizeof ty) == 0);
@@ -269,14 +269,14 @@ static void assert_pt_add_or_double(void)
     /* r = 2G + G (generic addition) */
     u256_cmov(mx, g2x, 1);
     u256_cmov(my, g2y, 1);
-    m256_prep(mx, p256_p);
-    m256_prep(my, p256_p);
+    m256_prep(mx, &p256_p);
+    m256_prep(my, &p256_p);
 
     point_add_or_double_leaky(rx, ry, rz, mx, my, p256_gx, p256_gy);
 
     point_to_affine(rx, ry, rz);
-    m256_done(rx, p256_p);
-    m256_done(ry, p256_p);
+    m256_done(rx, &p256_p);
+    m256_done(ry, &p256_p);
 
     assert(memcmp(rx, g3x, sizeof rx) == 0);
     assert(memcmp(ry, g3y, sizeof ry) == 0);
@@ -285,20 +285,20 @@ static void assert_pt_add_or_double(void)
     point_add_or_double_leaky(rx, ry, rz, p256_gx, p256_gy, p256_gx, p256_gy);
 
     point_to_affine(rx, ry, rz);
-    m256_done(rx, p256_p);
-    m256_done(ry, p256_p);
+    m256_done(rx, &p256_p);
+    m256_done(ry, &p256_p);
 
     assert(memcmp(rx, g2x, sizeof rx) == 0);
     assert(memcmp(ry, g2y, sizeof ry) == 0);
 
     /* r = (-G) + G (zero) */
     u256_cmov(my, g1yn, 1);
-    m256_prep(my, p256_p);
+    m256_prep(my, &p256_p);
 
     point_add_or_double_leaky(rx, ry, rz, p256_gx, my, p256_gx, p256_gy);
 
-    m256_done(rx, p256_p);
-    m256_done(ry, p256_p);
+    m256_done(rx, &p256_p);
+    m256_done(ry, &p256_p);
 
     u256_set32(mx, 0);
     assert(memcmp(rz, mx, sizeof rz) == 0);
@@ -323,12 +323,12 @@ static void assert_pt_bytes(void)
     assert(memcmp(p, gbytes, sizeof p) == 0);
 
     /* invalid: x or y too big, (x, y) not on curve */
-    u256_to_bytes(p, p256_p);
+    u256_to_bytes(p, p256_p.m);
     ret = point_from_bytes(x, y, p);
     assert(ret != 0);
 
     u256_to_bytes(p, one);
-    u256_to_bytes(p + 32, p256_p);
+    u256_to_bytes(p + 32, p256_p.m);
     ret = point_from_bytes(x, y, p);
     assert(ret != 0);
 
@@ -353,8 +353,8 @@ static void assert_scalar_mult(void)
     u256_set32(k, 2);
     scalar_mult(x, y, z, p256_gx, p256_gy, k);
     point_to_affine(x, y, z);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, g2x, sizeof x) == 0);
     assert(memcmp(y, g2y, sizeof y) == 0);
 
@@ -362,17 +362,17 @@ static void assert_scalar_mult(void)
     u256_set32(k, 3);
     scalar_mult(x, y, z, p256_gx, p256_gy, k);
     point_to_affine(x, y, z);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, g3x, sizeof x) == 0);
     assert(memcmp(y, g3y, sizeof y) == 0);
 
     /* (n-1) * g */
-    u256_sub(k, p256_n, one);
+    u256_sub(k, p256_n.m, one);
     scalar_mult(x, y, z, p256_gx, p256_gy, k);
     point_to_affine(x, y, z);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, gx_raw, sizeof x) == 0);
     assert(memcmp(y, g1yn, sizeof y) == 0);
 
@@ -380,8 +380,8 @@ static void assert_scalar_mult(void)
     u256_sub(k, k, one);
     scalar_mult(x, y, z, p256_gx, p256_gy, k);
     point_to_affine(x, y, z);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, g2x, sizeof x) == 0);
     assert(memcmp(y, g2yn, sizeof y) == 0);
 
@@ -389,8 +389,8 @@ static void assert_scalar_mult(void)
     u256_sub(k, k, one);
     scalar_mult(x, y, z, p256_gx, p256_gy, k);
     point_to_affine(x, y, z);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, g3x, sizeof x) == 0);
     assert(memcmp(y, g3yn, sizeof y) == 0);
 
@@ -399,15 +399,15 @@ static void assert_scalar_mult(void)
     point_to_affine(x, y, z);
     u256_cmov(xx, x, 1);
     u256_cmov(yy, y, 1);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, rgx, sizeof x) == 0);
     assert(memcmp(y, rgy, sizeof y) == 0);
 
     scalar_mult(x, y, z, xx, yy, s);
     point_to_affine(x, y, z);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, rsgx, sizeof x) == 0);
     assert(memcmp(y, rsgy, sizeof y) == 0);
 
@@ -416,15 +416,15 @@ static void assert_scalar_mult(void)
     point_to_affine(x, y, z);
     u256_cmov(xx, x, 1);
     u256_cmov(yy, y, 1);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, sgx, sizeof x) == 0);
     assert(memcmp(y, sgy, sizeof y) == 0);
 
     scalar_mult(x, y, z, xx, yy, r);
     point_to_affine(x, y, z);
-    m256_done(x, p256_p);
-    m256_done(y, p256_p);
+    m256_done(x, &p256_p);
+    m256_done(y, &p256_p);
     assert(memcmp(x, rsgx, sizeof x) == 0);
     assert(memcmp(y, rsgy, sizeof y) == 0);
 }
@@ -440,11 +440,11 @@ static void assert_sbytes(void)
     assert(scalar_from_bytes(z, p) == 0);
     assert(memcmp(z, one, sizeof z) == 0);
 
-    u256_cmov(z, p256_n, 1);
+    u256_cmov(z, p256_n.m, 1);
     u256_to_bytes(p, z);
     assert(scalar_from_bytes(z, p) == -1);
 
-    u256_sub(z, p256_n, one);
+    u256_sub(z, p256_n.m, one);
     u256_to_bytes(p, z);
     assert(scalar_from_bytes(z, p) == 0);
 
@@ -556,7 +556,7 @@ static void assert_ecdh_gen_pair(void)
 
     /* unlucky RNG, need to retry */
     memset(pub, 0, 32);
-    u256_to_bytes(pub + 32, p256_n);
+    u256_to_bytes(pub + 32, p256_n.m);
     fix_rng(pub, 64, 0);
     ret = p256_ecdh_gen_pair(priv, pub);
     assert(ret == 0);
@@ -638,7 +638,7 @@ static void assert_ecdsa_sign(void)
 
     /* unlucky RNG, need to retry */
     memset(sig, 0, 32);
-    u256_to_bytes(sig + 32, p256_n);
+    u256_to_bytes(sig + 32, p256_n.m);
     fix_rng(sig, 64, 0);
     ret = p256_ecdsa_sign(sig, ecdsa_priv, h256a, sizeof h256a);
     assert(ret == 0);
