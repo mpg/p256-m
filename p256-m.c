@@ -952,6 +952,7 @@ static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
 int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64])
 {
     uint32_t s[8], x[8], y[8];
+    // TODO: securely overwrite s before returning
     int ret = scalar_gen_with_pub(priv, s, x, y);
 
     point_to_bytes(pub, x, y);
@@ -967,6 +968,7 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
     uint32_t s[8], px[8], py[8], x[8], y[8], z[8];
     int ret;
 
+    // TODO: securely overwrite s before returning
     ret = scalar_from_bytes(s, priv);
     if (ret != 0)
         return ret;
@@ -1045,6 +1047,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     /* 1. Set ephemeral keypair */
     uint8_t kb[32];
     uint32_t k[8], xr[8], yr[8];
+    // TODO: securely erase kb, k before returning
     ret = scalar_gen_with_pub(kb, k, xr, yr);
     if (ret != 0)
         return ret;
@@ -1073,6 +1076,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
 
     /* 6. Compute s = k^-1 * (e + r * dU) */
     uint32_t du[8];
+    // TODO: securely erase du before returning
     ret = m256_from_bytes(du, priv, &p256_n);
     /* Just validating input, so branches are OK */
     if (ret != 0)
