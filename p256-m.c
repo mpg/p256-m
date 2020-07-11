@@ -1044,11 +1044,14 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
      */
     int ret;
 
+    /* Temporary buffers - the first two are mostly stable, so have names */
+    uint32_t xr[8], k[8], t3[8], t4[8];
+
     /* 1. Set ephemeral keypair */
-    uint8_t kb[32];
-    uint32_t k[8], xr[8], yr[8];
-    // TODO: securely erase kb, k before returning
-    ret = scalar_gen_with_pub(kb, k, xr, yr);
+    uint8_t *kb = (uint8_t *) t4;
+    /* Note: on normal exit, kb will be erased by re-using t4 for dU */
+    // TODO: what about early exits?
+    ret = scalar_gen_with_pub(kb, k, xr, t3);   /* xr = x_coord(k * G) */
     if (ret != 0)
         return ret;
     m256_prep(k, &p256_n);
@@ -1057,8 +1060,8 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     m256_done(xr, &p256_p);
 
     /* 3. Reduce xr mod n (extra: output it while at it) */
-    uint32_t c = u256_sub(yr, xr, p256_n.m);
-    u256_cmov(xr, yr, 1 - c);
+    uint32_t c = u256_sub(t3, xr, p256_n.m);
+    u256_cmov(xr, t3, 1 - c);                   /* xr = int(xr) mod n */
 
     /* xr is public data so it's OK to use a branch */
     if (u256_diff0(xr) == 0)
@@ -1071,38 +1074,37 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     /* 4. Skipped - we take the hash as an input, not the message */
 
     /* 5. Derive an integer from the hash */
-    uint32_t e[8];
-    ecdsa_m256_from_hash(e, hash, hlen);
+    ecdsa_m256_from_hash(t3, hash, hlen);   /* t3 = e */
 
     /* 6. Compute s = k^-1 * (e + r * dU) */
-    uint32_t du[8];
-    // TODO: securely erase du before returning
-    ret = m256_from_bytes(du, priv, &p256_n);
+    /* Note: dU will be erased by re-using t4 for the value of s (public) */
+    ret = m256_from_bytes(t4, priv, &p256_n);   /* t4 = dU */
     /* Just validating input, so branches are OK */
     if (ret != 0)
         return ret;
-    if (u256_diff0(du) == 0)
+    if (u256_diff0(t4) == 0)
         return -1;
-    CT_POISON(du, 32);
+    CT_POISON(t4, 32);
     CT_POISON(priv, 32);
 
-    uint32_t s[8];
-    m256_inv(s, k, &p256_n);         /* s = k^-1 */
-    m256_mul(yr, xr, du, &p256_n);   /* yr = r * dU */
-    m256_add(yr, e, yr, &p256_n);    /* yr = e + r * dU */
-    m256_mul(s, s, yr, &p256_n);     /* s = k^-1 * (e + r * dU) */
+    m256_inv(k, k, &p256_n);        /* k^-1 */
+    m256_mul(t4, xr, t4, &p256_n);  /* t4 = r * dU */
+    m256_add(t4, t3, t4, &p256_n);  /* t4 = e + r * dU */
+    m256_mul(t4, k, t4, &p256_n);   /* t4 = s = k^-1 * (e + r * dU) */
+    // TODO: though t4 is no longer sensitive, still need to erase k,
+    // as it contains k^1 which is equally sensitive
 
     /* 7. Output s (r already outputed at step 3) */
 
-    CT_UNPOISON(s, 32);
+    CT_UNPOISON(t4, 32);
     /* s is public data so it's OK to use a branch */
-    if (u256_diff0(s) == 0) {
+    if (u256_diff0(t4) == 0) {
         /* undo early output of xr */
-        u256_to_bytes(sig, s);
+        u256_to_bytes(sig, t4);
         return -1;
     }
 
-    m256_to_bytes(sig + 32, s, &p256_n);
+    m256_to_bytes(sig + 32, t4, &p256_n);
 
     return 0;
 }
