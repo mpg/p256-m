@@ -8,8 +8,8 @@
  * Helpers to test constant-time behaviour with valgrind or MemSan.
  *
  * CT_POISON() is used for secret data. It marks the memory area as
- * uninitialised, so that any branch or pointer dereference that depends (even
- * indirectly) on it triggers a warning.
+ * uninitialised, so that any branch or pointer dereference that depends on it
+ * (even indirectly) triggers a warning.
  * CT_UNPOISON() is used for public data; it marks the area as initialised.
  *
  * These are macros in order to avoid interfering with origin tracking.
@@ -932,16 +932,14 @@ static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
             return -1;
 
         ret = p256_generate_random(sbytes, 32);
+        CT_POISON(sbytes, 32);
         if (ret != 0)
             return ret;
 
         ret = scalar_from_bytes(s, sbytes);
+        CT_UNPOISON(&ret, sizeof ret);
     }
     while (ret != 0);
-
-    /* all representations of the scalar are now secrets */
-    CT_POISON(sbytes, 32);
-    CT_POISON(s, 32);
 
     /* compute and ouput the associated public key */
     scalar_mult(x, y, p256_gx, p256_gy, s);
@@ -978,15 +976,16 @@ int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64])
 int p256_ecdh_shared_secret(uint8_t secret[32],
                             const uint8_t priv[32], const uint8_t peer[64])
 {
+    CT_POISON(priv, 32);
+
     uint32_t s[8], px[8], py[8], x[8], y[8];
     int ret;
 
     // TODO: securely overwrite s before returning
     ret = scalar_from_bytes(s, priv);
+    CT_UNPOISON(&ret, sizeof ret);
     if (ret != 0)
         return ret;
-    CT_POISON(s, 32);
-    CT_POISON(priv, 32);
 
     ret = point_from_bytes(px, py, peer);
     if (ret != 0)
@@ -1048,6 +1047,8 @@ static void ecdsa_m256_from_hash(uint32_t z[8],
 int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
                     const uint8_t *hash, size_t hlen)
 {
+    CT_POISON(priv, 32);
+
     /*
      * Steps and notations from [SEC1] 4.1.3
      *
@@ -1089,15 +1090,13 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     ecdsa_m256_from_hash(t3, hash, hlen);   /* t3 = e */
 
     /* 6. Compute s = k^-1 * (e + r * dU) */
+
     /* Note: dU will be erased by re-using t4 for the value of s (public) */
-    ret = m256_from_bytes(t4, priv, &p256_n);   /* t4 = dU */
-    /* Just validating input, so branches are OK */
+    ret = scalar_from_bytes(t4, priv);   /* t4 = dU (integer domain) */
+    CT_UNPOISON(&ret, sizeof ret); /* Result of input validation */
     if (ret != 0)
         return ret;
-    if (u256_diff0(t4) == 0)
-        return -1;
-    CT_POISON(t4, 32);
-    CT_POISON(priv, 32);
+    m256_prep(t4, &p256_n);         /* t4 = dU (Montgomery domain) */
 
     m256_inv(k, k, &p256_n);        /* k^-1 */
     m256_mul(t4, xr, t4, &p256_n);  /* t4 = r * dU */
@@ -1107,15 +1106,12 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     // as it contains k^1 which is equally sensitive
 
     /* 7. Output s (r already outputed at step 3) */
-
     CT_UNPOISON(t4, 32);
-    /* s is public data so it's OK to use a branch */
     if (u256_diff0(t4) == 0) {
-        /* undo early output of xr */
+        /* undo early output of r */
         u256_to_bytes(sig, t4);
         return -1;
     }
-
     m256_to_bytes(sig + 32, t4, &p256_n);
 
     return 0;
