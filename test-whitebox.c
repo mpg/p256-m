@@ -147,6 +147,12 @@ static void assert_inv(void)
     m256_inv(z, rm, &p256_n);
     m256_done(z, &p256_n);
     assert(memcmp(z, rin, sizeof z) == 0);
+
+    /* Special case: rm == 0 */
+    m256_set32(rm, 0, &p256_p);
+    m256_inv(z, rm, &p256_p);
+    m256_done(z, &p256_p);
+    assert(memcmp(z, zero, sizeof z) == 0);
 }
 
 static void assert_mbytes()
@@ -219,6 +225,16 @@ static void assert_pt_affine(void)
 
     assert(memcmp(x, p256_gx, sizeof x) == 0);
     assert(memcmp(y, p256_gy, sizeof y) == 0);
+
+    /* Special case: z == 0 (that is, input point is 0) */
+    m256_set32(x, 1, &p256_p);
+    m256_set32(y, 1, &p256_p);
+    m256_set32(z, 0, &p256_p);
+
+    point_to_affine(x, y, z);
+
+    assert(memcmp(x, zero, sizeof x) == 0);
+    assert(memcmp(y, zero, sizeof y) == 0);
 }
 
 static void assert_pt_double(void)

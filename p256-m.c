@@ -433,11 +433,12 @@ static void m256_set32(uint32_t z[8], uint32_t x, const m256_mod *mod)
  * in: x in [0, m)
  *     mod must point to a valid m256_mod structure
  *     such that mod->m % 2^32 >= 2, assumed to be public.
- * out: z = = x^-1 * 2^512 mod m
+ * out: z = x^-1 * 2^512 mod m if x != 0,
+ *      z = 0 if x == 0
  * That is, if x = x_actual    * 2^256 mod m, then
  *             z = x_actual^-1 * 2^256 mod m
  *
- * Note: as a memory area, z may overlap with x or y.
+ * Note: as a memory area, z may overlap with x.
  */
 static void m256_inv(uint32_t z[8], const uint32_t x[8],
                      const m256_mod *mod)
@@ -521,7 +522,7 @@ static void m256_to_bytes(uint8_t p[32],
  * Operations on curve points
  *
  * Points are represented in two coordinates system:
- *  - affine (x, y)
+ *  - affine (x, y) - extended to represent 0 (see below)
  *  - jacobian (x:y:z)
  * In either case, coordinates are integers modulo p256_p and
  * are always represented in the Montgomery domain.
@@ -529,8 +530,12 @@ static void m256_to_bytes(uint8_t p[32],
  * For background on jacobian coordinates, see for example [GECC] 3.2.2:
  * - conversions go (x, y) -> (x:y:1) and (x:y:z) -> (x/z^2, y/z^3)
  * - the curve equation becomes y^2 = x^3 - 3 x z^4 + b z^6
- * - the origin (aka 0 aka point at infinity) is (x:y:0) with y^2 = x^3.
+ * - 0 (aka the origin aka point at infinity) is (x:y:0) with y^2 = x^3.
  * - point negation goes -(x:y:z) = (x:-y:z)
+ *
+ * Normally 0 (the point at infinity) can't be represented in affine
+ * coordinates. However we extend affine coordinates with the convention that
+ * (0, 0) (which is normally not a point on the curve) is interpreted as 0.
  *
  * References:
  * - [GECC]: Guide to Elliptic Curve Cryptography; Hankerson, Menezes,
@@ -571,7 +576,8 @@ static const uint32_t p256_gy[8] = { /* G_y * 2^256 mod p */
  * Point-on-curve check - do the coordinates satisfy the curve's equation?
  *
  * in: x, y in [0, p)   (Montgomery domain)
- * out: 0 if the point lies on the curve, unspecified non-zero otherwise
+ * out: 0 if the point lies on the curve and is not 0,
+ *      unspecified non-zero otherwise
  */
 static uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
 {
@@ -593,10 +599,12 @@ static uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
 /*
  * In-place jacobian to affine coordinate conversion
  *
- * in: x, y, z in [0, p)        (Montgomery domain)
+ * in: (x:y:z) must be on the curve (coordinates in Montegomery domain)
  * out: x_out = x_in / z_in^2   (Montgomery domain)
  *      y_out = y_in / z_in^3   (Montgomery domain)
  *      z_out unspecified, must be disregarded
+ *
+ * Note: if z is 0 (that is, the input point is 0), x_out = y_out = 0.
  */
 static void point_to_affine(uint32_t x[8], uint32_t y[8], uint32_t z[8])
 {
@@ -661,8 +669,8 @@ static void point_double(uint32_t x[8], uint32_t y[8], uint32_t z[8])
 /*
  * In-place point addition in jacobian-affine coordinates (Montgomery domain)
  *
- * in: P_in = (x1:y1:z1), must be on the curve and not the origin
- *     Q = (x2, y2), must be on the curve and not P_in or -P_in
+ * in: P_in = (x1:y1:z1), must be on the curve and not 0
+ *     Q = (x2, y2), must be on the curve and not P_in or -P_in or 0
  * out: P_out = (x1:y1:z1) = P_in + Q
  */
 static void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
@@ -716,8 +724,8 @@ static void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
 /*
  * Point addition or doubling (affine to jacobian, Montgomery domain)
  *
- * in: P = (x1, y1) - must be on the curve and not the origin
- *     Q = (x2, y2) - must be on the curve and not the origin
+ * in: P = (x1, y1) - must be on the curve and not 0
+ *     Q = (x2, y2) - must be on the curve and not 0
  * out: (x3:y3:z3) = R = P + Q
  *
  * Note: unlike point_add(), this function works if P = +- Q;
@@ -755,7 +763,8 @@ static void point_add_or_double_leaky(
  *
  * in: p = (x, y) concatenated, fixed-width 256-bit big-endian integers
  * out: x, y in Mongomery domain
- *      return 0 if x and y are both in [0, p) and (x, y) is on the curve,
+ *      return 0 if x and y are both in [0, p)
+ *                  and (x, y) is on the curve and not 0
  *             unspecified non-zero otherwise.
  *      x and y are unspecified and must be discarded if returning non-zero.
  */
@@ -778,6 +787,7 @@ static int point_from_bytes(uint32_t x[8], uint32_t y[8], const uint8_t p[64])
  * Export curve point to bytes
  *
  * in: x, y affine coordinates of a point (Montgomery domain)
+ *     must be on the curve and not 0
  * out: p = (x, y) concatenated, fixed-width 256-bit big-endian integers
  */
 static void point_to_bytes(uint8_t p[64],
@@ -796,7 +806,7 @@ static void point_to_bytes(uint8_t p[64],
 /*
  * Scalar multiplication
  *
- * in: P = (px, py), affine (Montgomery), must be on the curve
+ * in: P = (px, py), affine (Montgomery), must be on the curve and not 0
  *     s in [1, n-1]
  * out: R = s * P = (rx:ry:rz), jacobian coordinates (Montgomery).
  */
