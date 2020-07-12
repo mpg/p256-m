@@ -1,6 +1,10 @@
 /*
  * Implementation of curve P-256 (ECDH and ECDSA)
  */
+/*
+ * Copyright Manuel Pégourié-Gonnard.
+ * All rights reserved.
+ */
 
 #include "p256-m.h"
 

@@ -1,6 +1,10 @@
 /*
  * Interface of curve P-256 (ECDH and ECDSA)
  */
+/*
+ * Copyright Manuel Pégourié-Gonnard.
+ * All rights reserved.
+ */
 
 #include <stdint.h>
 #include <stddef.h>
