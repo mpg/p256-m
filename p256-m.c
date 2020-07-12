@@ -726,35 +726,36 @@ static void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
  *
  * in: P = (x1, y1) - must be on the curve and not 0
  *     Q = (x2, y2) - must be on the curve and not 0
- * out: (x3:y3:z3) = R = P + Q
+ * out: (x3, y3) = R = P + Q
  *
  * Note: unlike point_add(), this function works if P = +- Q;
  * however it leaks information on its input through timing,
  * branches taken and memory access patterns (if observable).
  */
 static void point_add_or_double_leaky(
-                        uint32_t x3[8], uint32_t y3[8], uint32_t z3[8],
+                        uint32_t x3[8], uint32_t y3[8],
                         const uint32_t x1[8], const uint32_t y1[8],
                         const uint32_t x2[8], const uint32_t y2[8])
 {
+
+    uint32_t z3[8];
+    u256_cmov(x3, x1, 1);
+    u256_cmov(y3, y1, 1);
+    m256_set32(z3, 1, &p256_p);
+
     if (u256_diff(x1, x2) != 0) {
         // P != +- Q -> generic addition
-        u256_cmov(x3, x1, 1);
-        u256_cmov(y3, y1, 1);
-        m256_set32(z3, 1, &p256_p);
         point_add(x3, y3, z3, x2, y2);
+        point_to_affine(x3, y3, z3);
     }
     else if (u256_diff(y1, y2) == 0) {
         // P == Q -> double
-        u256_cmov(x3, x1, 1);
-        u256_cmov(y3, y1, 1);
-        m256_set32(z3, 1, &p256_p);
         point_double(x3, y3, z3);
+        point_to_affine(x3, y3, z3);
     } else {
         // P == -Q -> zero
-        m256_set32(x3, 1, &p256_p);
-        m256_set32(y3, 1, &p256_p);
-        m256_set32(z3, 0, &p256_p);
+        m256_set32(x3, 0, &p256_p);
+        m256_set32(y3, 0, &p256_p);
     }
 }
 
@@ -1166,7 +1167,7 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     if (ret != 0)
         return ret;
 
-    uint32_t rx[8], ry[8], rz[8];
+    uint32_t rx[8], ry[8];
     uint32_t r2x[8], r2y[8];
     scalar_mult(r2x, r2y, px, py, u2);            /* R2 = u2 * Qu */
 
@@ -1179,10 +1180,9 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
         scalar_mult(r1x, r1y, p256_gx, p256_gy, u1);  /* R1 = u1 * G */
 
         /* R = R1 + R2 */
-        point_add_or_double_leaky(rx, ry, rz, r1x, r1y, r2x, r2y);
+        point_add_or_double_leaky(rx, ry, r1x, r1y, r2x, r2y);
         /* No need to check if R == 0 here: if that's the case, it will be
          * caught when comparating rx (which will be 0) to r (which isn't). */
-        point_to_affine(rx, ry, rz);
     }
 
     /* 6. Convert xR to an integer */

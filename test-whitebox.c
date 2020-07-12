@@ -280,7 +280,7 @@ static void assert_pt_add(void)
 
 static void assert_pt_add_or_double(void)
 {
-    uint32_t rx[8], ry[8], rz[8], mx[8], my[8];
+    uint32_t rx[8], ry[8], mx[8], my[8];
 
     /* r = 2G + G (generic addition) */
     u256_cmov(mx, g2x, 1);
@@ -288,9 +288,8 @@ static void assert_pt_add_or_double(void)
     m256_prep(mx, &p256_p);
     m256_prep(my, &p256_p);
 
-    point_add_or_double_leaky(rx, ry, rz, mx, my, p256_gx, p256_gy);
+    point_add_or_double_leaky(rx, ry, mx, my, p256_gx, p256_gy);
 
-    point_to_affine(rx, ry, rz);
     m256_done(rx, &p256_p);
     m256_done(ry, &p256_p);
 
@@ -298,9 +297,8 @@ static void assert_pt_add_or_double(void)
     assert(memcmp(ry, g3y, sizeof ry) == 0);
 
     /* r = G + G (double) */
-    point_add_or_double_leaky(rx, ry, rz, p256_gx, p256_gy, p256_gx, p256_gy);
+    point_add_or_double_leaky(rx, ry, p256_gx, p256_gy, p256_gx, p256_gy);
 
-    point_to_affine(rx, ry, rz);
     m256_done(rx, &p256_p);
     m256_done(ry, &p256_p);
 
@@ -311,16 +309,13 @@ static void assert_pt_add_or_double(void)
     u256_cmov(my, g1yn, 1);
     m256_prep(my, &p256_p);
 
-    point_add_or_double_leaky(rx, ry, rz, p256_gx, my, p256_gx, p256_gy);
+    point_add_or_double_leaky(rx, ry, p256_gx, my, p256_gx, p256_gy);
 
     m256_done(rx, &p256_p);
     m256_done(ry, &p256_p);
 
-    u256_set32(mx, 0);
-    assert(memcmp(rz, mx, sizeof rz) == 0);
-    u256_set32(mx, 1);
-    assert(memcmp(rx, mx, sizeof rx) == 0);
-    assert(memcmp(ry, mx, sizeof rx) == 0);
+    assert(memcmp(rx, zero, sizeof rx) == 0);
+    assert(memcmp(ry, zero, sizeof rx) == 0);
 }
 
 static void assert_pt_bytes(void)
