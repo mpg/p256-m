@@ -6,8 +6,8 @@ SRC=p256-m.c
 HDR=p256-m.h
 
 CC=clang
-CFLAGS=-Werror -Weverything --std=c99 -O1
-CFLAGS_SAN=
+CFLAGS=-Werror -Weverything --std=c99 -Os
+CFLAGS_SAN=-fsanitize=address -fsanitize=undefined
 
 runtest: $(TESTBLACK) $(TESTWHITE)
 	./$(TESTBLACK)
