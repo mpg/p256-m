@@ -3,23 +3,22 @@
 set -eu
 
 SRC=p256-m.c
-CFLAGS_COMMON="-Werror --std=c99 -fomit-frame-pointer $SRC"
+CFLAGS_COMMON="-Werror --std=c99 -fomit-frame-pointer -mthumb $SRC"
 
 gcc() {
-    arm-none-eabi-gcc -Wall -Wextra -pedantic -mthumb \
+    arm-none-eabi-gcc -Wall -Wextra -pedantic \
         -Os $CFLAGS_COMMON "$@"
 }
 
 clang() {
-    env clang -Weverything -Wno-missing-prototypes \
-        -Wno-missing-variable-declarations --target=arm-none-eabi \
+    env clang --target=arm-none-eabi -Weverything \
         -Oz $CFLAGS_COMMON "$@"
 }
 
 OBJECTS=''
 
 for CC in gcc clang; do
-    for CPU in m0; do
+    for CPU in m0 m4 a5; do
         NAME="${CC}-${CPU}"
         $CC -mcpu=cortex-$CPU -S -fverbose-asm -o ${NAME}.s
         $CC -mcpu=cortex-$CPU -c -o ${NAME}.o
