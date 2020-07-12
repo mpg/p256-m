@@ -808,9 +808,11 @@ static void point_to_bytes(uint8_t p[64],
  *
  * in: P = (px, py), affine (Montgomery), must be on the curve and not 0
  *     s in [1, n-1]
- * out: R = s * P = (rx:ry:rz), jacobian coordinates (Montgomery).
+ * out: R = s * P = (rx, ry), affine coordinates (Montgomery).
+ *
+ * Note: as memory areas, none of the parameters may overlap.
  */
-static void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
+static void scalar_mult(uint32_t rx[8], uint32_t ry[8],
                         const uint32_t px[8], const uint32_t py[8],
                         const uint32_t s[8])
 {
@@ -820,7 +822,7 @@ static void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
      * implicit recoding, and a different loop initialisation to avoid feeding
      * 0 to our addition formulas, as they don't support it.
      */
-    uint32_t s_odd[8], py_neg[8], py_use[8];
+    uint32_t s_odd[8], py_neg[8], py_use[8], rz[8];
 
     /*
      * Make s odd by replacing it with n - s if necessary.
@@ -881,6 +883,8 @@ static void scalar_mult(uint32_t rx[8], uint32_t ry[8], uint32_t rz[8],
         point_double(rx, ry, rz);
         point_add(rx, ry, rz, px, py_use);
     }
+
+    point_to_affine(rx, ry, rz);
 }
 
 /*
@@ -939,9 +943,7 @@ static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
     CT_POISON(s, 32);
 
     /* compute and ouput the associated public key */
-    uint32_t z[8];
-    scalar_mult(x, y, z, p256_gx, p256_gy, s);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, s);
 
     /* the associated public key is not a secret */
     CT_UNPOISON(x, 32);
@@ -975,7 +977,7 @@ int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64])
 int p256_ecdh_shared_secret(uint8_t secret[32],
                             const uint8_t priv[32], const uint8_t peer[64])
 {
-    uint32_t s[8], px[8], py[8], x[8], y[8], z[8];
+    uint32_t s[8], px[8], py[8], x[8], y[8];
     int ret;
 
     // TODO: securely overwrite s before returning
@@ -989,8 +991,7 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
     if (ret != 0)
         return ret;
 
-    scalar_mult(x, y, z, px, py, s);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, px, py, s);
 
     m256_to_bytes(secret, x, &p256_p);
     CT_UNPOISON(secret, 32);
@@ -1166,18 +1167,16 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
         return ret;
 
     uint32_t rx[8], ry[8], rz[8];
-    uint32_t r2x[8], r2y[8], r2z[8];
-    scalar_mult(r2x, r2y, r2z, px, py, u2);            /* R2 = u2 * Qu */
-    point_to_affine(r2x, r2y, r2z);
+    uint32_t r2x[8], r2y[8];
+    scalar_mult(r2x, r2y, px, py, u2);            /* R2 = u2 * Qu */
 
     if (u256_diff0(u1) == 0) {
         /* u1 out of range for scalar_mult() - just skip it */
         u256_cmov(rx, r2x, 1);
         /* we don't care about y and z */
     } else {
-        uint32_t r1x[8], r1y[8], r1z[8];
-        scalar_mult(r1x, r1y, r1z, p256_gx, p256_gy, u1);  /* R1 = u1 * G */
-        point_to_affine(r1x, r1y, r1z);
+        uint32_t r1x[8], r1y[8];
+        scalar_mult(r1x, r1y, p256_gx, p256_gy, u1);  /* R1 = u1 * G */
 
         /* R = R1 + R2 */
         point_add_or_double_leaky(rx, ry, rz, r1x, r1y, r2x, r2y);

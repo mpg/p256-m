@@ -356,19 +356,17 @@ static void assert_pt_bytes(void)
 
 static void assert_scalar_mult(void)
 {
-    uint32_t x[8], y[8], z[8], k[8], xx[8], yy[8];
+    uint32_t x[8], y[8], k[8], xx[8], yy[8];
 
     /* 1 * g */
     u256_set32(k, 1);
-    scalar_mult(x, y, z, p256_gx, p256_gy, k);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, k);
     assert(memcmp(x, p256_gx, sizeof x) == 0);
     assert(memcmp(y, p256_gy, sizeof y) == 0);
 
     /* 2 * g */
     u256_set32(k, 2);
-    scalar_mult(x, y, z, p256_gx, p256_gy, k);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, k);
     m256_done(x, &p256_p);
     m256_done(y, &p256_p);
     assert(memcmp(x, g2x, sizeof x) == 0);
@@ -376,8 +374,7 @@ static void assert_scalar_mult(void)
 
     /* 3 * g */
     u256_set32(k, 3);
-    scalar_mult(x, y, z, p256_gx, p256_gy, k);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, k);
     m256_done(x, &p256_p);
     m256_done(y, &p256_p);
     assert(memcmp(x, g3x, sizeof x) == 0);
@@ -385,8 +382,7 @@ static void assert_scalar_mult(void)
 
     /* (n-1) * g */
     u256_sub(k, p256_n.m, one);
-    scalar_mult(x, y, z, p256_gx, p256_gy, k);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, k);
     m256_done(x, &p256_p);
     m256_done(y, &p256_p);
     assert(memcmp(x, gx_raw, sizeof x) == 0);
@@ -394,8 +390,7 @@ static void assert_scalar_mult(void)
 
     /* (n-2) * g */
     u256_sub(k, k, one);
-    scalar_mult(x, y, z, p256_gx, p256_gy, k);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, k);
     m256_done(x, &p256_p);
     m256_done(y, &p256_p);
     assert(memcmp(x, g2x, sizeof x) == 0);
@@ -403,16 +398,14 @@ static void assert_scalar_mult(void)
 
     /* (n-3) * g */
     u256_sub(k, k, one);
-    scalar_mult(x, y, z, p256_gx, p256_gy, k);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, k);
     m256_done(x, &p256_p);
     m256_done(y, &p256_p);
     assert(memcmp(x, g3x, sizeof x) == 0);
     assert(memcmp(y, g3yn, sizeof y) == 0);
 
     /* rG then s(rG) */
-    scalar_mult(x, y, z, p256_gx, p256_gy, r);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, r);
     u256_cmov(xx, x, 1);
     u256_cmov(yy, y, 1);
     m256_done(x, &p256_p);
@@ -420,16 +413,14 @@ static void assert_scalar_mult(void)
     assert(memcmp(x, rgx, sizeof x) == 0);
     assert(memcmp(y, rgy, sizeof y) == 0);
 
-    scalar_mult(x, y, z, xx, yy, s);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, xx, yy, s);
     m256_done(x, &p256_p);
     m256_done(y, &p256_p);
     assert(memcmp(x, rsgx, sizeof x) == 0);
     assert(memcmp(y, rsgy, sizeof y) == 0);
 
     /* sG then r(sG) */
-    scalar_mult(x, y, z, p256_gx, p256_gy, s);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, p256_gx, p256_gy, s);
     u256_cmov(xx, x, 1);
     u256_cmov(yy, y, 1);
     m256_done(x, &p256_p);
@@ -437,8 +428,7 @@ static void assert_scalar_mult(void)
     assert(memcmp(x, sgx, sizeof x) == 0);
     assert(memcmp(y, sgy, sizeof y) == 0);
 
-    scalar_mult(x, y, z, xx, yy, r);
-    point_to_affine(x, y, z);
+    scalar_mult(x, y, xx, yy, r);
     m256_done(x, &p256_p);
     m256_done(y, &p256_p);
     assert(memcmp(x, rsgx, sizeof x) == 0);
