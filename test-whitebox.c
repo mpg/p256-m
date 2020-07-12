@@ -545,21 +545,21 @@ static void assert_rng_for_tests(void)
  * ECDH functions
  */
 
-static void assert_ecdh_gen_pair(void)
+static void assert_gen_keypair(void)
 {
     int ret;
     uint8_t priv[32], pub[64];
 
     /* non-random RNG - always zero */
     fix_rng(NULL, 128, 0);
-    ret = p256_ecdh_gen_pair(priv, pub);
+    ret = p256_gen_keypair(priv, pub);
     assert(ret == -1);
 
     /* unlucky RNG, need to retry */
     memset(pub, 0, 32);
     u256_to_bytes(pub + 32, p256_n.m);
     fix_rng(pub, 64, 0);
-    ret = p256_ecdh_gen_pair(priv, pub);
+    ret = p256_gen_keypair(priv, pub);
     assert(ret == 0);
     assert(nb_drawn == 96);
 }
@@ -689,7 +689,7 @@ int main(void)
     assert_sbytes();
 
     /* ecdh */
-    assert_ecdh_gen_pair();
+    assert_gen_keypair();
 
     /* ecdsa */
     assert_ecdsa_from_hash();

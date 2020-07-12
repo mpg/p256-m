@@ -961,16 +961,10 @@ static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
     return 0;
 }
 
-/**********************************************************************
- *
- * ECDH
- *
- **********************************************************************/
-
 /*
- * ECDH generate pair
+ * ECDH/ECDSA generate pair
  */
-int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64])
+int p256_gen_keypair(uint8_t priv[32], uint8_t pub[64])
 {
     uint32_t s[8], x[8], y[8];
     int ret = scalar_gen_with_pub(priv, s, x, y);
@@ -979,6 +973,12 @@ int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64])
     point_to_bytes(pub, x, y);
     return ret;
 }
+
+/**********************************************************************
+ *
+ * ECDH
+ *
+ **********************************************************************/
 
 /*
  * ECDH compute shared secret
