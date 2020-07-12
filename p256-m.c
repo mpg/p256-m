@@ -5,6 +5,16 @@
 #include "p256-m.h"
 
 /*
+ * Zeroize memory - this should not be optimized away
+ */
+static void zeroize(void *d, size_t n)
+{
+    volatile char *p = d;
+    while( n-- )
+        *p++ = 0;
+}
+
+/*
  * Helpers to test constant-time behaviour with valgrind or MemSan.
  *
  * CT_POISON() is used for secret data. It marks the memory area as
@@ -963,8 +973,8 @@ static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
 int p256_ecdh_gen_pair(uint8_t priv[32], uint8_t pub[64])
 {
     uint32_t s[8], x[8], y[8];
-    // TODO: securely overwrite s before returning
     int ret = scalar_gen_with_pub(priv, s, x, y);
+    zeroize(s, sizeof s);
 
     point_to_bytes(pub, x, y);
     return ret;
@@ -981,21 +991,23 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
     uint32_t s[8], px[8], py[8], x[8], y[8];
     int ret;
 
-    // TODO: securely overwrite s before returning
     ret = scalar_from_bytes(s, priv);
     CT_UNPOISON(&ret, sizeof ret);
     if (ret != 0)
-        return ret;
+        goto cleanup;
 
     ret = point_from_bytes(px, py, peer);
     if (ret != 0)
-        return ret;
+        goto cleanup;
 
     scalar_mult(x, y, px, py, s);
 
     m256_to_bytes(secret, x, &p256_p);
     CT_UNPOISON(secret, 32);
-    return 0;
+
+cleanup:
+    zeroize(s, sizeof s);
+    return ret;
 }
 
 /**********************************************************************
@@ -1062,8 +1074,8 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
 
     /* 1. Set ephemeral keypair */
     uint8_t *kb = (uint8_t *) t4;
-    /* Note: on normal exit, kb will be erased by re-using t4 for dU */
-    // TODO: what about early exits?
+    /* kb will be erased by re-using t4 for dU - if we exit before that, we
+     * haven't read the private key yet so we kb isn't sensitive yet */
     ret = scalar_gen_with_pub(kb, k, xr, t3);   /* xr = x_coord(k * G) */
     if (ret != 0)
         return ret;
@@ -1102,8 +1114,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     m256_mul(t4, xr, t4, &p256_n);  /* t4 = r * dU */
     m256_add(t4, t3, t4, &p256_n);  /* t4 = e + r * dU */
     m256_mul(t4, k, t4, &p256_n);   /* t4 = s = k^-1 * (e + r * dU) */
-    // TODO: though t4 is no longer sensitive, still need to erase k,
-    // as it contains k^1 which is equally sensitive
+    zeroize(k, sizeof k);
 
     /* 7. Output s (r already outputed at step 3) */
     CT_UNPOISON(t4, 32);
