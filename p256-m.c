@@ -1134,7 +1134,7 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
      */
     int ret;
 
-    /* 1. Validate range of r and s */
+    /* 1. Validate range of r and s : [1, n-1] */
     uint32_t r[8], s[8];
     ret = scalar_from_bytes(r, sig);
     if (ret != 0)
@@ -1149,7 +1149,7 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     uint32_t e[8];
     ecdsa_m256_from_hash(e, hash, hlen);
 
-    /* 4. Compute u1 and u2 */
+    /* 4. Compute u1 = e * s^-1 and u2 = r * s^-1 */
     uint32_t u1[8], u2[8];
     m256_prep(s, &p256_n);           /* s in Montgomery domain */
     m256_inv(s, s, &p256_n);         /* s = s^-1 mod n */
@@ -1161,39 +1161,36 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     m256_mul(u2, u2, s, &p256_n);    /* u2 = r * s^-1 mod n */
     m256_done(u2, &p256_n);          /* u2 out of Montgomery domain */
 
-    /* 5. Compute R */
+    /* 5. Compute R (and re-use (u1, u2) to store its coordinates */
     uint32_t px[8], py[8];
     ret = point_from_bytes(px, py, pub);
     if (ret != 0)
         return ret;
 
-    uint32_t rx[8], ry[8];
-    uint32_t r2x[8], r2y[8];
-    scalar_mult(r2x, r2y, px, py, u2);            /* R2 = u2 * Qu */
+    scalar_mult(e, s, px, py, u2);      /* (e, s) = R2 = u2 * Qu */
 
     if (u256_diff0(u1) == 0) {
         /* u1 out of range for scalar_mult() - just skip it */
-        u256_cmov(rx, r2x, 1);
-        /* we don't care about y and z */
+        u256_cmov(u1, e, 1);
+        /* we don't care about the y coordinate */
     } else {
-        uint32_t r1x[8], r1y[8];
-        scalar_mult(r1x, r1y, p256_gx, p256_gy, u1);  /* R1 = u1 * G */
+        scalar_mult(px, py, p256_gx, p256_gy, u1); /* (px, py) = R1 = u1 * G */
 
-        /* R = R1 + R2 */
-        point_add_or_double_leaky(rx, ry, r1x, r1y, r2x, r2y);
+        /* (u1, u2) = R = R1 + R2 */
+        point_add_or_double_leaky(u1, u2, px, py, e, s);
         /* No need to check if R == 0 here: if that's the case, it will be
          * caught when comparating rx (which will be 0) to r (which isn't). */
     }
 
     /* 6. Convert xR to an integer */
-    m256_done(rx, &p256_p);
+    m256_done(u1, &p256_p);
 
     /* 7. Reduce xR mod n */
-    uint32_t c = u256_sub(ry, rx, p256_n.m);
-    u256_cmov(rx, ry, 1 - c);
+    uint32_t c = u256_sub(u2, u1, p256_n.m);
+    u256_cmov(u1, u2, 1 - c);
 
     /* 8. Compare xR mod n to r */
-    uint32_t diff = u256_diff(rx, r);
+    uint32_t diff = u256_diff(u1, r);
     if (diff == 0)
         return 0;
 
