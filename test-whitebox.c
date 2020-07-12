@@ -649,7 +649,7 @@ static void assert_ecdsa_sign(void)
     memset(sig, 42, sizeof sig);
     fix_rng(k256a, 32, 0);
     ret = p256_ecdsa_sign(sig, ecdsa_priv, h256a_s0, sizeof h256a_s0);
-    assert(ret == -1);
+    assert(ret == P256_RANDOM_FAILED);
     for (unsigned i = 0; i < 32; i++) {
         assert(sig[i] == 0 && sig[i+32] == 42);
     }

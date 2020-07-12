@@ -970,7 +970,7 @@ static int scalar_from_bytes(uint32_t s[8], const uint8_t p[32])
  * out: sbytes the big-endian bytes representation of the scalar
  *      s its u256 representation
  *      x, y the affine coordinates of s * G (Montgomery domain)
- *      return 0 if OK, non-zero on failure
+ *      return 0 if OK, -1 on failure
  *      sbytes, s, x, y must be discarded when returning non-zero.
  */
 static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
@@ -986,7 +986,7 @@ static int scalar_gen_with_pub(uint8_t sbytes[32], uint32_t s[8],
         ret = p256_generate_random(sbytes, 32);
         CT_POISON(sbytes, 32);
         if (ret != 0)
-            return ret;
+            return -1;
 
         ret = scalar_from_bytes(s, sbytes);
         CT_UNPOISON(&ret, sizeof ret);
@@ -1011,9 +1011,11 @@ int p256_gen_keypair(uint8_t priv[32], uint8_t pub[64])
     uint32_t s[8], x[8], y[8];
     int ret = scalar_gen_with_pub(priv, s, x, y);
     zeroize(s, sizeof s);
+    if (ret != 0)
+        return P256_RANDOM_FAILED;
 
     point_to_bytes(pub, x, y);
-    return ret;
+    return 0;
 }
 
 /**********************************************************************
@@ -1035,12 +1037,16 @@ int p256_ecdh_shared_secret(uint8_t secret[32],
 
     ret = scalar_from_bytes(s, priv);
     CT_UNPOISON(&ret, sizeof ret);
-    if (ret != 0)
+    if (ret != 0) {
+        ret = P256_INVALID_PRIVKEY;
         goto cleanup;
+    }
 
     ret = point_from_bytes(px, py, peer);
-    if (ret != 0)
+    if (ret != 0) {
+        ret = P256_INVALID_PUBKEY;
         goto cleanup;
+    }
 
     scalar_mult(x, y, px, py, s);
 
@@ -1120,7 +1126,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
      * haven't read the private key yet so we kb isn't sensitive yet */
     ret = scalar_gen_with_pub(kb, k, xr, t3);   /* xr = x_coord(k * G) */
     if (ret != 0)
-        return ret;
+        return P256_RANDOM_FAILED;
     m256_prep(k, &p256_n);
 
     /* 2. Convert xr to an integer */
@@ -1132,7 +1138,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
 
     /* xr is public data so it's OK to use a branch */
     if (u256_diff0(xr) == 0)
-        return -1;
+        return P256_RANDOM_FAILED;
 
     u256_to_bytes(sig, xr);
 
@@ -1149,7 +1155,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     ret = scalar_from_bytes(t4, priv);   /* t4 = dU (integer domain) */
     CT_UNPOISON(&ret, sizeof ret); /* Result of input validation */
     if (ret != 0)
-        return ret;
+        return P256_INVALID_PRIVKEY;
     m256_prep(t4, &p256_n);         /* t4 = dU (Montgomery domain) */
 
     m256_inv(k, k, &p256_n);        /* k^-1 */
@@ -1163,11 +1169,11 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     if (u256_diff0(t4) == 0) {
         /* undo early output of r */
         u256_to_bytes(sig, t4);
-        return -1;
+        return P256_RANDOM_FAILED;
     }
     m256_to_bytes(sig + 32, t4, &p256_n);
 
-    return 0;
+    return P256_SUCCESS;
 }
 
 /*
@@ -1187,10 +1193,10 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     uint32_t r[8], s[8];
     ret = scalar_from_bytes(r, sig);
     if (ret != 0)
-        return ret;
+        return P256_INVALID_SIGNATURE;
     ret = scalar_from_bytes(s, sig + 32);
     if (ret != 0)
-        return ret;
+        return P256_INVALID_SIGNATURE;
 
     /* 2. Skipped - we take the hash as an input, not the message */
 
@@ -1214,7 +1220,7 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     uint32_t px[8], py[8];
     ret = point_from_bytes(px, py, pub);
     if (ret != 0)
-        return ret;
+        return P256_INVALID_PUBKEY;
 
     scalar_mult(e, s, px, py, u2);      /* (e, s) = R2 = u2 * Qu */
 
@@ -1241,9 +1247,9 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     /* 8. Compare xR mod n to r */
     uint32_t diff = u256_diff(u1, r);
     if (diff == 0)
-        return 0;
+        return P256_SUCCESS;
 
-    return -1;
+    return P256_INVALID_SIGNATURE;
 }
 
 #if 0 /* utilities for debugging */

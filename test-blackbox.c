@@ -36,7 +36,7 @@ static void assert_ecdsa_verify_one(const uint8_t sig[64],
 
     /* valid */
     ret = p256_ecdsa_verify(sig, ecdsa_pub, hash, hlen);
-    assert(ret == 0);
+    assert(ret == P256_SUCCESS);
 
     /* corrupt the first or last bit of r or s */
     uint8_t bad_sig[64];
@@ -44,22 +44,22 @@ static void assert_ecdsa_verify_one(const uint8_t sig[64],
     memcpy(bad_sig, sig, sizeof bad_sig);
     bad_sig[0] ^= 0x80;
     ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
-    assert(ret != 0);
+    assert(ret == P256_INVALID_SIGNATURE);
 
     memcpy(bad_sig, sig, sizeof bad_sig);
     bad_sig[31] ^= 0x01;
     ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
-    assert(ret != 0);
+    assert(ret == P256_INVALID_SIGNATURE);
 
     memcpy(bad_sig, sig, sizeof bad_sig);
     bad_sig[32] ^= 0x80;
     ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
-    assert(ret != 0);
+    assert(ret == P256_INVALID_SIGNATURE);
 
     memcpy(bad_sig, sig, sizeof bad_sig);
     bad_sig[63] ^= 0x01;
     ret = p256_ecdsa_verify(bad_sig, ecdsa_pub, hash, hlen);
-    assert(ret != 0);
+    assert(ret == P256_INVALID_SIGNATURE);
 
     /* corrupt the first bit of hash (the last one may be truncated away) */
     uint8_t bad_hash[64];
@@ -67,7 +67,7 @@ static void assert_ecdsa_verify_one(const uint8_t sig[64],
     memcpy(bad_hash, hash, hlen);
     bad_hash[0] ^= 0x80;
     ret = p256_ecdsa_verify(sig, ecdsa_pub, bad_hash, hlen);
-    assert(ret != 0);
+    assert(ret == P256_INVALID_SIGNATURE);
 }
 
 static void assert_ecdsa_verify(void)
@@ -87,24 +87,24 @@ static void assert_ecdsa_verify(void)
 
     /* r, s out of range */
     const size_t hlen = sizeof h256a;
-    assert(0 != p256_ecdsa_verify(sig_bad_r0, ecdsa_pub, h256a, hlen));
-    assert(0 != p256_ecdsa_verify(sig_bad_rn, ecdsa_pub, h256a, hlen));
-    assert(0 != p256_ecdsa_verify(sig_bad_rm, ecdsa_pub, h256a, hlen));
-    assert(0 != p256_ecdsa_verify(sig_bad_s0, ecdsa_pub, h256a, hlen));
-    assert(0 != p256_ecdsa_verify(sig_bad_sn, ecdsa_pub, h256a, hlen));
-    assert(0 != p256_ecdsa_verify(sig_bad_sm, ecdsa_pub, h256a, hlen));
+    assert(P256_INVALID_SIGNATURE == p256_ecdsa_verify(sig_bad_r0, ecdsa_pub, h256a, hlen));
+    assert(P256_INVALID_SIGNATURE == p256_ecdsa_verify(sig_bad_rn, ecdsa_pub, h256a, hlen));
+    assert(P256_INVALID_SIGNATURE == p256_ecdsa_verify(sig_bad_rm, ecdsa_pub, h256a, hlen));
+    assert(P256_INVALID_SIGNATURE == p256_ecdsa_verify(sig_bad_s0, ecdsa_pub, h256a, hlen));
+    assert(P256_INVALID_SIGNATURE == p256_ecdsa_verify(sig_bad_sn, ecdsa_pub, h256a, hlen));
+    assert(P256_INVALID_SIGNATURE == p256_ecdsa_verify(sig_bad_sm, ecdsa_pub, h256a, hlen));
 
     /* pub invalid (coordinates out of range) */
-    assert(0 != p256_ecdsa_verify(sig256a, pub_bad_xp, h256a, hlen));
-    assert(0 != p256_ecdsa_verify(sig256a, pub_bad_xm, h256a, hlen));
-    assert(0 != p256_ecdsa_verify(sig256a, pub_bad_yp, h256a, hlen));
-    assert(0 != p256_ecdsa_verify(sig256a, pub_bad_ym, h256a, hlen));
+    assert(P256_INVALID_PUBKEY == p256_ecdsa_verify(sig256a, pub_bad_xp, h256a, hlen));
+    assert(P256_INVALID_PUBKEY == p256_ecdsa_verify(sig256a, pub_bad_xm, h256a, hlen));
+    assert(P256_INVALID_PUBKEY == p256_ecdsa_verify(sig256a, pub_bad_yp, h256a, hlen));
+    assert(P256_INVALID_PUBKEY == p256_ecdsa_verify(sig256a, pub_bad_ym, h256a, hlen));
 
     /* invalid signature for crafted hash that gives u1 G + u2 Q == 0 */
-    assert(0 != p256_ecdsa_verify(sig256a, ecdsa_pub, h256a_s0, hlen));
+    assert(P256_INVALID_SIGNATURE == p256_ecdsa_verify(sig256a, ecdsa_pub, h256a_s0, hlen));
 
     /* invalid signature for crafted hash that gives u1 G == u2 Q */
-    assert(0 != p256_ecdsa_verify(sig256a, ecdsa_pub, h256a_double, hlen));
+    assert(P256_INVALID_SIGNATURE == p256_ecdsa_verify(sig256a, ecdsa_pub, h256a_double, hlen));
 }
 
 /* validate sign against verify */
@@ -114,8 +114,8 @@ static void assert_ecdsa_sign_one(const uint8_t *hash, size_t hlen)
     uint8_t sig[64];
 
     ret = p256_ecdsa_sign(sig, ecdsa_priv, hash, hlen);
-    assert(ret == 0);
-    assert(p256_ecdsa_verify(sig, ecdsa_pub, hash, hlen) == 0);
+    assert(ret == P256_SUCCESS);
+    assert(p256_ecdsa_verify(sig, ecdsa_pub, hash, hlen) == P256_SUCCESS);
 }
 
 static void assert_ecdsa_sign(void)
@@ -134,13 +134,13 @@ static void assert_ecdsa_sign(void)
 
     /* bad priv (out-of-range) */
     uint8_t sig[64];
-    assert(0 != p256_ecdsa_sign(sig, priv_bad_0, h256a, sizeof h256a));
-    assert(0 != p256_ecdsa_sign(sig, priv_bad_n, h256a, sizeof h256a));
-    assert(0 != p256_ecdsa_sign(sig, priv_bad_m, h256a, sizeof h256a));
+    assert(P256_INVALID_PRIVKEY == p256_ecdsa_sign(sig, priv_bad_0, h256a, sizeof h256a));
+    assert(P256_INVALID_PRIVKEY == p256_ecdsa_sign(sig, priv_bad_n, h256a, sizeof h256a));
+    assert(P256_INVALID_PRIVKEY == p256_ecdsa_sign(sig, priv_bad_m, h256a, sizeof h256a));
 
     /* failing RNG */
     rng_ret = 42;
-    assert(0 != p256_ecdsa_sign(sig, ecdsa_priv, h256a, sizeof h256a));
+    assert(P256_RANDOM_FAILED == p256_ecdsa_sign(sig, ecdsa_priv, h256a, sizeof h256a));
 }
 
 /* validate ecdh_shared_secret() against one test vector */
@@ -150,8 +150,8 @@ static void assert_ecdh_shared_one(const uint8_t refsec[32],
 {
     uint8_t sec[32];
     int ret = p256_ecdh_shared_secret(sec, priv, pub);
-    assert(ret == 0);
-    assert(memcmp(sec, refsec, sizeof sec) == 0);
+    assert(ret == P256_SUCCESS);
+    assert(memcmp(sec, refsec, sizeof sec) == P256_SUCCESS);
 }
 
 static void assert_ecdh_shared(void)
@@ -169,15 +169,15 @@ static void assert_ecdh_shared(void)
 
     /* bad priv (out-of-range) */
     uint8_t sec[32];
-    assert(0 != p256_ecdh_shared_secret(sec, priv_bad_0, ecdh0_o));
-    assert(0 != p256_ecdh_shared_secret(sec, priv_bad_n, ecdh0_o));
-    assert(0 != p256_ecdh_shared_secret(sec, priv_bad_m, ecdh0_o));
+    assert(P256_INVALID_PRIVKEY == p256_ecdh_shared_secret(sec, priv_bad_0, ecdh0_o));
+    assert(P256_INVALID_PRIVKEY == p256_ecdh_shared_secret(sec, priv_bad_n, ecdh0_o));
+    assert(P256_INVALID_PRIVKEY == p256_ecdh_shared_secret(sec, priv_bad_m, ecdh0_o));
 
     /* bad peer (out-of-range coordinates) */
-    assert(0 != p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_xp));
-    assert(0 != p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_xm));
-    assert(0 != p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_yp));
-    assert(0 != p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_ym));
+    assert(P256_INVALID_PUBKEY == p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_xp));
+    assert(P256_INVALID_PUBKEY == p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_xm));
+    assert(P256_INVALID_PUBKEY == p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_yp));
+    assert(P256_INVALID_PUBKEY == p256_ecdh_shared_secret(sec, ecdh0_d, pub_bad_ym));
 }
 
 /* validate gen_keypair() against ecdh_shared_secret() */
@@ -188,18 +188,18 @@ static void assert_gen_keypair_one(void)
     uint8_t b_priv[32], b_pub[64], b_sec[32];
 
     ret = p256_gen_keypair(a_priv, a_pub);
-    assert(ret == 0);
+    assert(ret == P256_SUCCESS);
 
     ret = p256_gen_keypair(b_priv, b_pub);
-    assert(ret == 0);
+    assert(ret == P256_SUCCESS);
 
     ret = p256_ecdh_shared_secret(a_sec, a_priv, b_pub);
-    assert(ret == 0);
+    assert(ret == P256_SUCCESS);
 
     ret = p256_ecdh_shared_secret(b_sec, b_priv, a_pub);
-    assert(ret == 0);
+    assert(ret == P256_SUCCESS);
 
-    assert(memcmp(a_sec, b_sec, 32) == 0);
+    assert(memcmp(a_sec, b_sec, 32) == P256_SUCCESS);
 }
 
 static void assert_gen_keypair(void)
@@ -210,7 +210,7 @@ static void assert_gen_keypair(void)
     /* failing RNG */
     uint8_t priv[32], pub[64];
     rng_ret = 42;
-    assert(0 != p256_gen_keypair(priv, pub));
+    assert(P256_RANDOM_FAILED == p256_gen_keypair(priv, pub));
 }
 
 int main(void)
