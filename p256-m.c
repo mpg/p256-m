@@ -338,6 +338,20 @@ static void m256_add(uint32_t z[8],
 }
 
 /*
+ * Modular addition mod p
+ *
+ * in: x, y in [0, p)
+ * out: z = (x + y) mod p, in [0, p)
+ *
+ * Note: as a memory area, z must be either equal to x or y, or not overlap.
+ */
+static void m256_add_p(uint32_t z[8],
+                       const uint32_t x[8], const uint32_t y[8])
+{
+    m256_add(z, x, y, &p256_p);
+}
+
+/*
  * Modular subtraction
  *
  * in: x, y in [0, m)
@@ -357,6 +371,20 @@ static void m256_sub(uint32_t z[8],
      * In that case z is in [2^256 - m + 1, 2^256 - 1], so the
      * addition will have a carry as well, which cancels out. */
     u256_cmov(z, r, carry);
+}
+
+/*
+ * Modular subtraction mod p
+ *
+ * in: x, y in [0, p)
+ * out: z = (x + y) mod p, in [0, p)
+ *
+ * Note: as a memory area, z must be either equal to x or y, or not overlap.
+ */
+static void m256_sub_p(uint32_t z[8],
+                       const uint32_t x[8], const uint32_t y[8])
+{
+    m256_sub(z, x, y, &p256_p);
 }
 
 /*
@@ -394,6 +422,20 @@ static void m256_mul(uint32_t z[8],
     uint32_t carry_sub = u256_sub(z, a, mod->m);
     uint32_t use_sub = carry_add | (1 - carry_sub);     // see m256_add()
     u256_cmov(z, a, 1 - use_sub);
+}
+
+/*
+ * Montgomery modular multiplication modulo p.
+ *
+ * in: x, y in [0, p)
+ * out: z = (x * y) / 2^256 mod p, in [0, p)
+ *
+ * Note: as a memory area, z may overlap with x or y.
+ */
+static void m256_mul_p(uint32_t z[8],
+                       const uint32_t x[8], const uint32_t y[8])
+{
+    m256_mul(z, x, y, &p256_p);
 }
 
 /*
@@ -594,14 +636,14 @@ static uint32_t point_check(const uint32_t x[8], const uint32_t y[8])
     uint32_t lhs[8], rhs[8];
 
     /* lhs = y^2 */
-    m256_mul(lhs, y, y, &p256_p);
+    m256_mul_p(lhs, y, y);
 
     /* rhs = x^3 - 3x + b */
-    m256_mul(rhs, x,   x, &p256_p);      /* x^2 */
-    m256_mul(rhs, rhs, x, &p256_p);      /* x^3 */
+    m256_mul_p(rhs, x,   x);      /* x^2 */
+    m256_mul_p(rhs, rhs, x);      /* x^3 */
     for (unsigned i = 0; i < 3; i++)
-        m256_sub(rhs, rhs, x, &p256_p);  /* x^3 - 3x */
-    m256_add(rhs, rhs, p256_b, &p256_p); /* x^3 - 3x + b */
+        m256_sub_p(rhs, rhs, x);  /* x^3 - 3x */
+    m256_add_p(rhs, rhs, p256_b); /* x^3 - 3x + b */
 
     return u256_diff(lhs, rhs);
 }
@@ -620,13 +662,13 @@ static void point_to_affine(uint32_t x[8], uint32_t y[8], uint32_t z[8])
 {
     uint32_t t[8];
 
-    m256_inv(z, z, &p256_p);     /* z = z^-1 */
+    m256_inv(z, z, &p256_p);    /* z = z^-1 */
 
-    m256_mul(t, z, z, &p256_p);  /* t = z^-2 */
-    m256_mul(x, x, t, &p256_p);  /* x = x * z^-2 */
+    m256_mul_p(t, z, z);        /* t = z^-2 */
+    m256_mul_p(x, x, t);        /* x = x * z^-2 */
 
-    m256_mul(t, t, z, &p256_p);  /* t = z^-3 */
-    m256_mul(y, y, t, &p256_p);  /* y = y * z^-3 */
+    m256_mul_p(t, t, z);        /* t = z^-3 */
+    m256_mul_p(y, y, t);        /* y = y * z^-3 */
 }
 
 /*
@@ -644,36 +686,36 @@ static void point_double(uint32_t x[8], uint32_t y[8], uint32_t z[8])
     uint32_t m[8], s[8], u[8];
 
     /* m = 3 * x^2 + a * z^4 = 3 * (x + z^2) * (x - z^2) */
-    m256_mul(s, z, z, &p256_p);
-    m256_add(m, x, s, &p256_p);
-    m256_sub(u, x, s, &p256_p);
-    m256_mul(s, m, u, &p256_p);
-    m256_add(m, s, s, &p256_p);
-    m256_add(m, m, s, &p256_p);
+    m256_mul_p(s, z, z);
+    m256_add_p(m, x, s);
+    m256_sub_p(u, x, s);
+    m256_mul_p(s, m, u);
+    m256_add_p(m, s, s);
+    m256_add_p(m, m, s);
 
     /* s = 4 * x * y^2 */
-    m256_mul(u, y, y, &p256_p);
-    m256_add(u, u, u, &p256_p); /* u = 2 * y^2 (used below) */
-    m256_mul(s, x, u, &p256_p);
-    m256_add(s, s, s, &p256_p);
+    m256_mul_p(u, y, y);
+    m256_add_p(u, u, u); /* u = 2 * y^2 (used below) */
+    m256_mul_p(s, x, u);
+    m256_add_p(s, s, s);
 
     /* u = 8 * y^4 (not named in the paper, first term of y3) */
-    m256_mul(u, u, u, &p256_p);
-    m256_add(u, u, u, &p256_p);
+    m256_mul_p(u, u, u);
+    m256_add_p(u, u, u);
 
     /* x3 = t = m^2 - 2 * s */
-    m256_mul(x, m, m, &p256_p);
-    m256_sub(x, x, s, &p256_p);
-    m256_sub(x, x, s, &p256_p);
+    m256_mul_p(x, m, m);
+    m256_sub_p(x, x, s);
+    m256_sub_p(x, x, s);
 
     /* z3 = 2 * y * z */
-    m256_mul(z, y, z, &p256_p);
-    m256_add(z, z, z, &p256_p);
+    m256_mul_p(z, y, z);
+    m256_add_p(z, z, z);
 
     /* y3 = -u + m * (s - t) */
-    m256_sub(y, s, x, &p256_p);
-    m256_mul(y, y, m, &p256_p);
-    m256_sub(y, y, u, &p256_p);
+    m256_sub_p(y, s, x);
+    m256_mul_p(y, y, m);
+    m256_sub_p(y, y, u);
 }
 
 /*
@@ -695,40 +737,40 @@ static void point_add(uint32_t x1[8], uint32_t y1[8], uint32_t z1[8],
     /* u1 = x1 and s1 = y1 (no computations) */
 
     /* t1 = u2 = x2 z1^2 */
-    m256_mul(t1, z1, z1, &p256_p);
-    m256_mul(t2, t1, z1, &p256_p);
-    m256_mul(t1, t1, x2, &p256_p);
+    m256_mul_p(t1, z1, z1);
+    m256_mul_p(t2, t1, z1);
+    m256_mul_p(t1, t1, x2);
 
     /* t2 = s2 = y2 z1^3 */
-    m256_mul(t2, t2, y2, &p256_p);
+    m256_mul_p(t2, t2, y2);
 
     /* t1 = h = u2 - u1 */
-    m256_sub(t1, t1, x1, &p256_p); /* t1 = x2 * z1^2 - x1 */
+    m256_sub_p(t1, t1, x1); /* t1 = x2 * z1^2 - x1 */
 
     /* t2 = r = s2 - s1 */
-    m256_sub(t2, t2, y1, &p256_p);
+    m256_sub_p(t2, t2, y1);
 
     /* z3 = z1 * h */
-    m256_mul(z1, z1, t1, &p256_p);
+    m256_mul_p(z1, z1, t1);
 
     /* t1 = h^3 */
-    m256_mul(t3, t1, t1, &p256_p);
-    m256_mul(t1, t3, t1, &p256_p);
+    m256_mul_p(t3, t1, t1);
+    m256_mul_p(t1, t3, t1);
 
     /* t3 = x1 * h^2 */
-    m256_mul(t3, t3, x1, &p256_p);
+    m256_mul_p(t3, t3, x1);
 
     /* x3 = r^2 - 2 * x1 * h^2 - h^3 */
-    m256_mul(x1, t2, t2, &p256_p);
-    m256_sub(x1, x1, t3, &p256_p);
-    m256_sub(x1, x1, t3, &p256_p);
-    m256_sub(x1, x1, t1, &p256_p);
+    m256_mul_p(x1, t2, t2);
+    m256_sub_p(x1, x1, t3);
+    m256_sub_p(x1, x1, t3);
+    m256_sub_p(x1, x1, t1);
 
     /* y3 = r * (x1 * h^2 - x3) - y1 h^3 */
-    m256_sub(t3, t3, x1, &p256_p);
-    m256_mul(t3, t3, t2, &p256_p);
-    m256_mul(t1, t1, y1, &p256_p);
-    m256_sub(y1, t3, t1, &p256_p);
+    m256_sub_p(t3, t3, x1);
+    m256_mul_p(t3, t3, t2);
+    m256_mul_p(t1, t1, y1);
+    m256_sub_p(y1, t3, t1);
 }
 
 /*
@@ -849,7 +891,7 @@ static void scalar_mult(uint32_t rx[8], uint32_t ry[8],
 
     /* Compute py_neg = - py mod p (that's the y coordinate of -P) */
     u256_set32(py_use, 0);
-    m256_sub(py_neg, py_use, py, &p256_p);
+    m256_sub_p(py_neg, py_use, py);
 
     /* Initialize R = P' = (x:(-1)^negate * y:1) */
     u256_cmov(rx, px, 1);
