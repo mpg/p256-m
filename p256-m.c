@@ -1181,8 +1181,8 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
 
         /* R = R1 + R2 */
         point_add_or_double_leaky(rx, ry, rz, r1x, r1y, r2x, r2y);
-        if (u256_diff0(rz) == 0)
-            return -1;
+        /* No need to check if R == 0 here: if that's the case, it will be
+         * caught when comparating rx (which will be 0) to r (which isn't). */
         point_to_affine(rx, ry, rz);
     }
 
