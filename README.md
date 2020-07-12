@@ -194,7 +194,113 @@ on a Raspberry Pi Model XXX running Linux distro YYY - **TODO**.
 
 ## Design overview
 
-**TODO**
+The implementation is contained in a single file to keep most functions static
+and allow for more optimisations. It is organized in multiple layers:
+
+- Fixed-width multi-precision arithmetic
+- Fixed-width modular arithmetic
+- Operations on curve points
+- Operations with scalars
+- The public API
+
+**Multi-precision arithmetic.**
+
+Large integers are represented as arrays of `uint32_t` limbs. When carries may
+occur, casts to `uint64_t` are used to nudge the compiler towards using the
+CPU's carry flag. When overflow may occur, functions return a carry flag.
+
+This layer's API consists of:
+
+- addition, subtraction;
+- multiply-and-add, shift by one limb (for Montgomery multiplication);
+- conditional assignment, assignment of a small value;
+- comparison of two values for equality, comparison to 0 for equality;
+- (de)serialization as big-endian arrays of bytes.
+
+**Modular arithmetic.**
+
+All modular operations are done in the Montgomery domain, that is x is
+represented by `x * 2^256 mod m`; integers need to be converted to that domain
+before computations, and back from it afterwards. Montgomery constants
+associated to the curve's p and n are pre-computed and stored static
+structures.
+
+Modular inversion is computed using Fermat's little theorem to get
+constant-time behaviour with respect to the value being inverted.
+
+This layer's API consists of:
+
+- the curve's constants p and n (and associated Montgomery constants);
+- modular addition, subtraction, multiplication, and inversion;
+- assignment of a small value;
+- conversion to/from Montgomery domain;
+- (de)serialization to/from bytes with integrated range checking and
+  Montgomery domain conversion.
+
+**Operations on curve points.**
+
+Curve points are represented using either affine or Jacobian coordinates;
+affine coordinates are extended to represent 0 as (0,0). Individual
+coordinates are always in the Montgomery domain.
+
+Not all formulas associated with affine or Jacobian coordinates are complete;
+great care is taken to document and satisfy each function's pre-conditions.
+
+This layer's API consists of:
+
+- curve constants: b from the equation, the base point's coordinates;
+- point validity check (on the curve and not 0);
+- Jacobian to affine coordinate conversion;
+- point doubling in Jacobian coordinates (complete formulas);
+- point addition in mixed affine-Jacobian coordinates (P not in {0, Q, -Q});
+- point addition-or-doubling in affine coordinates (leaky version, only used
+  for ECDSA verify where all data is public);
+- (de)serialization to/from bytes with integrated validity checking
+
+**Scalar operations.**
+
+The crucial function here is scalar multiplication. It uses a signed binary
+ladder, which is a variant of the good old double-and-add algorithm where an
+addition is performed at each step. Again, care is taken to make sure the
+pre-conditions for the addition formulas are always satisfied. The signed
+binary ladder only works if the scalar is odd; this is ensured by negating
+both the scalar (mod n) and the input point if necessary.
+
+This layer's API consists of:
+
+- scalar multiplication
+- de-serialization from bytes with integrated range checking
+- generation of a scalar and its associated public key
+
+**Public API.**
+
+This layer builds on the others, but unlike them, all inputs and outputs are
+byte arrays. Key generation and ECDH shared secret computation are thin
+wrappers around internal functions, just taking care of format conversions and
+errors. The ECDSA functions have more non-trivial logic.
+
+This layer's API consists of:
+
+- key-pair generation
+- ECDH shared secret computation
+- ECDSA signature creation
+- ECDSA signature verification
+
+**Testing.**
+
+A self-contained, straightforward, pure-Python implementation was first
+produced as a warm-up and to help check intermediate values. Test vectors from
+various sources are embedded and used to validate the implementation.
+
+This implementation, `p256.py`, is used by a second Python script,
+`gen-test-data.py`, to generate additional data for both positive and negative
+testing, available from a C header file, that is then used by the black-box
+and white-box test programs.
+
+p256-m can be compiled with extra instrumentation to mark secret data and
+allow either valgrind or MemSan to check that no branch or memory access
+depends on it (even indirectly). Macros are defined for this purpose near the
+top of the file.
 
 ## What about other curves?
 

@@ -907,7 +907,7 @@ static void scalar_mult(uint32_t rx[8], uint32_t ry[8],
      * For any odd number s_odd = b255 ... b1 1, we have
      *      s_odd = 2^255 + 2^254 sbit(b255) + ... + 2 sbit(b2) + sbit(b1)
      * writing
-     *      sbit(b) = 2 * b - 1 = b ? 1 : 1
+     *      sbit(b) = 2 * b - 1 = b ? 1 : -1
      *
      * Use that to compute s_odd * P' by repeating R = 2 * R +- P':
      *      s_odd * P' = 2 * ( ... (2 * P' + sbit(b255) P') ... ) + sbit(b1) P'
