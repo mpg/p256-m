@@ -1251,22 +1251,3 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
 
     return P256_INVALID_SIGNATURE;
 }
-
-#if 0 /* utilities for debugging */
-#include <stdio.h>
-static void print_u256(const char *name, const uint32_t x[8], uint32_t c)
-{
-    printf("%s: ", name);
-    for (int i = 7; i >= 0; i--)
-        printf("%08x", x[i]);
-    printf(" (%08x)\n", c);
-}
-
-static void print_m256(const char *name, const uint32_t x[8], const uint32_t m[8])
-{
-    uint32_t z[8];
-    u256_cmov(z, x, 1);
-    m256_done(z, m);
-    print_u256(name, z, 0);
-}
-#endif
