@@ -99,15 +99,15 @@ data on the stack before returning.
 
 Compiled with
 [ARM-GCC 9](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads),
-with `-mthumb -Os -fomit-frame-pointer`, the following sizes of are reached
-for selected cores:
+with `-mthumb -Os -fomit-frame-pointer`, here are samples of code sizes
+reached on selected cores:
 
 - Cortex-M0 core: 3000 bytes
 - Cortex-M4 core: 2920 bytes
 - Cortex-A5 core: 2928 bytes
 
 Clang was also tried but tends to generate larger code (by about 10%). For
-full details see `sizes.sh`.
+details, see `sizes.sh`.
 
 ## RAM usage
 
@@ -119,78 +119,92 @@ how much stack is used by each of its 4 public functions:
 - `p256_ecdsa_sign`: 720
 - `p256_ecdsa_verify`: 784
 
-For details of how these numbers were obtained, see `stack.sh`, `wcs.py` and
-`libc.msu`.
+For details, see `stack.sh`, `wcs.py` and `libc.msu`.
 
 ## Runtime performance
 
-See the table under "Runtime performance" in the next section.
+Timing for each public function in milliseconds, measured on a Raspberry Pi 2
+(Cortex-A7 core) running Raspbian Buster:
+
+- `p256_gen_keypair`: 14 ms
+- `p256_ecdh_shared_secret`: 14 ms
+- `p256_ecdsa_sign`: 15 ms
+- `p256_ecdsa_verify`: 29 ms
+
+For details, see `bench.sh` and `benchmark.c`.
 
 ## Comparison with other implementations
 
 The most relevant/convenient implementation for comparisons is
-[TinyCrypt](https://github.com/intel/tinycrypt) (version used: 0.2.8), as it's
-also a standalone implementation of ECDH and ECDSA on P-256 only, that also
-targets constrained devices. Other implementations tend to implement many
-curves and build on a shared bignum/MPI module (possibly also supporting RSA),
-which makes fair comparisons less convenient.
+[TinyCrypt](https://github.com/intel/tinycrypt), as it's also a standalone
+implementation of ECDH and ECDSA on P-256 only, that also targets constrained
+devices. Other implementations tend to implement many curves and build on a
+shared bignum/MPI module (possibly also supporting RSA), which makes fair
+comparisons less convenient.
 
-**Correctness & Security:**
+The scripts used for TinyCrypt measurements are available in [this
+branch](https://github.com/mpg/tinycrypt/tree/measurements), based on version
+0.2.8.
 
-- _API design:_ TinyCrypt seems to provide less systematic input validation
-  than p256-m. For example, TinyCrypt's `uECC_shared_secret()` does not seem
-to check that the peer's public key is valid, leaving it to the user to
-validate it with `uECC_valid_public_key()`. This may open the
-door to [invalid curve
-attacks](https://link.springer.com/chapter/10.1007/3-540-36288-6_16) if static
-ECDH is used and [users forget to
-validate](https://link.springer.com/chapter/10.1007/978-3-319-24174-6_21) the
-peer-provided data. By contrast, p256-m seems to be less likely to be misused
-in that way, as each public function fully validates all of its inputs.
-- _Local side channels:_ While TinyCrypt employs a regular scalar
-  multiplication algorithm, the underlying multi-precision and modular
-arithmetic is not constant-time. Similar characteristics in other libraries
-have been exploited by [multiple](https://eprint.iacr.org/2020/055) recent
-[attacks](https://eprint.iacr.org/2020/432). This means p256-m has a stronger
-argument for being secure against powerful local attackers (for example, an
-untrusted OS attacking a secure enclave).
-- _Physical side channels:_ On the other hand, TinyCrypt has some facilities
-  for using coordinate randomisation, which protects against some,
-but not all, passive physical attacks (see Table 3, column C9 of [this
-paper](https://www.esat.kuleuven.be/cosic/publications/article-2293.pdf#page=12)).
-This means TinyCrypt offers some protection against some attacks that p256-m
-doesn't even attempt to mitigate.
-
-**Footprint:**
+**Code size**
 
 |  | p256-m| TinyCrypt  |
 | --- | --- | --- |
-| Code size¹ | 3000 | 6134 |
-| Stack used² for key generation | 664 | 824 |
-| Stack used² for ECDH shared secret | 672 | 736 |
-| Stack used² for ECDSA sign | 720 | 888 |
-| Stack used² for ECDSA verify | 784 | 824 |
+| Cortex-M0 core | 3000 | 6134 |
+| Cortex-M4 core | 2920 | 5934 |
+| Cortex-A5 core | 2928 | 5934 |
 
-¹ Targeting a Cortex-M0 core - for p256-m, see `sizes.sh`; for TinyCrypt sum
-of the sizes of `ecc.o`, `ecc_dh.o` and `ecc_dsa.o` built with the same
-compiler and options.
+**RAM usage**
 
-² For p256-m, see `stack.sh`, `wcs.py` and `libc.msu`; for TinyCrypt similar
-scripts were used after lightly editing the source to replace indirect
-function calls (`g_rng_function`, function pointers in the `curve` structure)
-with direct function calls to allow the scripts to work.
+TinyCrypto also uses no heap, only the stack. Here's the RAM used by each
+operation:
 
-**Runtime performance:**
+|  | p256-m| TinyCrypt  |
+| --- | --- | --- |
+| key generation | 664 | 824 |
+| ECDH shared secret | 672 | 736 |
+| ECDSA sign | 720 | 888 |
+| ECDSA verify | 784 | 824 |
 
-Timing of various operations in milliseconds, measured using `gettimeofday()`
-on a Raspberry Pi Model XXX running Linux distro YYY - **TODO**.
+**Runtime performance**
+
+Timing for each operation in milliseconds, measured on a Raspberry Pi 2
+(Cortex-A7 core) running Raspbian Buster:
 
 |  | p256-m | TinyCrypt |
 | --- | --- | --- |
-| key generation | TODO | TODO |
-| ECDH shared secret | TODO | TODO |
-| ECDSA sign | TODO | TODO |
-| ECDSA verify | TODO | TODO |
+| key generation | 14 | 19 |
+| ECDH shared secret | 14 | 14 |
+| ECDSA sign | 15 | 14 |
+| ECDSA verify | 29 | 20 |
+
+**Other differences**
+
+- While p256-m fully validates all inputs, Tinycrypt's ECDH shared secret
+  function doesn't include validation of the peer's public key, which should be
+done separately by the user (there are attacks on static ECDH [when users
+forget](https://link.springer.com/chapter/10.1007/978-3-319-24174-6_21)).
+- The two implementation have slightly different security characteristics:
+  p256-m is fully constant-time from the ground up so should be more robust
+than TinyCrypt against powerful local attackers (such as an untrusted OS
+attacking a secure enclave); on the other hand TinyCrypt includes coordinate
+randomisation which protects against some passive physical attacks (such as
+DPA, see Table 3, column C9 of [this
+paper](https://www.esat.kuleuven.be/cosic/publications/article-2293.pdf#page=12)),
+which p256-m completely ignores.
+- TinyCrypt's code looks like it could easily be expanded to support other
+  curves, while p256-m has much more hard-coded to minimize code size (see
+"What about other curves?" below).
+- TinyCrypt uses a specialised routine for reduction modulo the curve prime,
+  exploiting its structure as a Solinas prime, which should be faster than the
+generic Montgomery reduction used by p256-m, but other factors appear to
+compensate for that.
+- TinyCrypt uses Co-Z Jacobian formulas for point operation, which should be
+  faster (though a bit larger) than the mixed affine-Jacobian formulas
+used by p256-m, but again other factors appear to compensate for that.
+- TinyCrypt uses a specialised routine based on Shamir's trick for
+  ECDSA verification, which gives better performance than the generic code
+used by p256-m, at the obvious cost of increased code size.
 
 ## Design overview
 
