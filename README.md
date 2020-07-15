@@ -173,10 +173,10 @@ Timing for each operation in milliseconds, measured on a Raspberry Pi 2
 
 |  | p256-m | TinyCrypt |
 | --- | --- | --- |
-| key generation | 14 | 19 |
+| key generation | 14 | 14 |
 | ECDH shared secret | 14 | 14 |
 | ECDSA sign | 15 | 14 |
-| ECDSA verify | 29 | 20 |
+| ECDSA verify | 29 | 16 |
 
 **Other differences**
 
@@ -203,8 +203,8 @@ compensate for that.
   faster (though a bit larger) than the mixed affine-Jacobian formulas
 used by p256-m, but again other factors appear to compensate for that.
 - TinyCrypt uses a specialised routine based on Shamir's trick for
-  ECDSA verification, which gives better performance than the generic code
-used by p256-m, at the obvious cost of increased code size.
+  ECDSA verification, which gives much better performance than the generic
+code that p256-m uses in order to minimize code size.
 
 ## Design overview
 
