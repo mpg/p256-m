@@ -23,29 +23,48 @@ static uint64_t usec(void)
     return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
 }
 
-#define TIMES   100
-
-#define TIMEIT(NAME, CODE)                                          \
+#define SUCCESS     P256_SUCCESS
+#define TIMES       100
+#define TIMEIT(N, CODE)                                             \
 do {                                                                \
+    if (CODE != SUCCESS)                                            \
+        printf("%s failed\n", names[N]);                            \
     const uint64_t start = usec();                                  \
     for (unsigned i = 0; i < TIMES; i++) {                          \
         CODE;                                                       \
     }                                                               \
-    const uint64_t ellapsed = usec() - start;                       \
-    printf("%s: %4"PRIu64" us\n", NAME, ellapsed / TIMES);          \
-    if( ret != 0)                                                   \
-        printf("FAILED\n");                                         \
+    results[N][i] = (usec() - start) / TIMES;                       \
 } while (0)
+
+#define RUNS 5
+
+int cmp_u64(const void *a, const void *b) {
+    uint64_t x = *((uint64_t *) a);
+    uint64_t y = *((uint64_t *) b);
+    if (x < y)
+        return -1;
+    if (x > y)
+        return 1;
+    return 0;
+}
 
 int main(void)
 {
-    int ret;
     uint8_t priv[32], pub[64], secret[32], sig[64], hash[32];
+    uint64_t results[4][RUNS];
+    const char * names[4] = {"Keygen", "ECDH", "Sign", "Verify"};
 
-    TIMEIT("Keygen", ret = p256_gen_keypair(priv, pub));
-    TIMEIT("ECDH", ret = p256_ecdh_shared_secret(secret, priv, pub));
-    TIMEIT("Sign", ret = p256_ecdsa_sign(sig, priv, hash, sizeof hash));
-    TIMEIT("Verify", ret = p256_ecdsa_verify(sig, pub, hash, sizeof hash));
+    for (unsigned i = 0; i < RUNS; i++) {
+        TIMEIT(0, p256_gen_keypair(priv, pub));
+        TIMEIT(1, p256_ecdh_shared_secret(secret, priv, pub));
+        TIMEIT(2, p256_ecdsa_sign(sig, priv, hash, sizeof hash));
+        TIMEIT(3, p256_ecdsa_verify(sig, pub, hash, sizeof hash));
+    }
+
+    for (unsigned n = 0; n < 4; n++) {
+        qsort(results[n], RUNS, sizeof results[n][0], cmp_u64);
+        printf("%s: %"PRIu64"\n", names[n], results[n][RUNS / 2]);
+    }
 
     return 0;
 }
