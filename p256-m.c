@@ -169,6 +169,38 @@ static uint32_t u256_diff0(const uint32_t x[8])
 }
 
 /*
+ * 32 x 32 -> 64-bit multiply
+ *
+ * in: x, y in [0, 2^32)
+ * out: x * y in [0, 2^64)
+ */
+static uint64_t u32_mul64(uint32_t x, uint32_t y)
+{
+#if defined(MUL64_IS_CONSTANT_TIME)
+    return (uint64_t) x * y;
+#else
+    /* x = xl + 2**16 xh, y = yl + 2**16 yh */
+    const uint16_t xl = (uint16_t) x;
+    const uint16_t yl = (uint16_t) y;
+    const uint16_t xh = x >> 16;
+    const uint16_t yh = y >> 16;
+
+    /* x*y = xl*yl + 2**16 (xh*yl + yl*yh) + 2**32 xh*yh
+     *     = lo    + 2**16 (m1    + m2   ) + 2**32 hi    */
+    const uint32_t lo = (uint32_t) xl * yl;
+    const uint32_t m1 = (uint32_t) xh * yl;
+    const uint32_t m2 = (uint32_t) xl * yh;
+    const uint32_t hi = (uint32_t) xh * yh;
+
+    uint64_t acc = lo + ((uint64_t) (hi + (m1 >> 16) + (m2 >> 16)) << 32);
+    acc += m1 << 16;
+    acc += m2 << 16;
+
+    return acc;
+#endif /* MUL64_IS_CONSTANT_TIME */
+}
+
+/*
  * 288 + 32 x 256 -> 288-bit multiply and add
  *
  * in: x in [0, 2^32)
@@ -187,7 +219,7 @@ static uint32_t u288_muladd(uint32_t z[9], uint32_t x, const uint32_t y[8])
     uint32_t carry = 0;
 
     for (unsigned i = 0; i < 8; i++) {
-        uint64_t prod = (uint64_t) x * y[i] + z[i] + carry;
+        uint64_t prod = u32_mul64(x, y[i]) + z[i] + carry;
         z[i] = (uint32_t) prod;
         carry = (uint32_t) (prod >> 32);
     }
