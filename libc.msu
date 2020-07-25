@@ -1,3 +1,2 @@
-memset 0
 __aeabi_lmul 16
 p256_generate_random 512

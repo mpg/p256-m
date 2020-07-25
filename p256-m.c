@@ -409,7 +409,11 @@ static void m256_mul(uint32_t z[8],
      * b = 2^32, n = 8, R = 2^256
      */
     uint32_t m_prime = mod->ni;
-    uint32_t a[9] = { 0 };
+    uint32_t a[9];
+
+    for (unsigned i = 0; i < 9; i++) {
+        a[i] = 0;
+    }
 
     for (unsigned i = 0; i < 8; i++) {
         /* the "mod 2^32" is implicit from the type */
@@ -1088,7 +1092,9 @@ static void ecdsa_m256_from_hash(uint32_t z[8],
     /* convert from h (big-endian) */
     /* hlen is public data so it's OK to branch on it */
     if (hlen < 32) {
-        uint8_t p[32] = { 0 };
+        uint8_t p[32];
+        for (unsigned i = 0; i < 32; i++)
+            p[i] = 0;
         for (unsigned i = 0; i < hlen; i++)
             p[32 - hlen + i] = h[i];
         u256_from_bytes(z, p);
