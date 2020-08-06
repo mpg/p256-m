@@ -70,7 +70,14 @@ properties:
 These properties are checked using valgrind and MemSan with the ideas
 behind [ctgrind](https://github.com/agl/ctgrind), see `consttime.sh`.
 
-(**TODO:** _clarify the situation with multiplication instructions._)
+In addition to avoiding branches and memory accesses depending on secret data,
+p256-m also avoid instructions (or library functions) whose execution time
+depends on the value of operands on common cores. Namely, it never uses
+integer division, and for multiplication by default it only uses 16x16->32 bit
+unsigned multiplication. On cores which have a constant-time 32x32->64 bit
+unsigned multiplication instruction, the symbol `MUL64_IS_CONSTANT_TIME` can
+be defined by the user at compile-time to take advantage of it in order to
+improve performance and code size.
 
 As a result, p256-m should be secure against the following classes of attackers:
 

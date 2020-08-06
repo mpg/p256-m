@@ -7,6 +7,10 @@ set -eu
 P256_SYM_RE='(u256|u288|m256|point|scalar|ecdsa|p256)_'
 
 for CPU in m0 m4 a5; do
+    case $CPU in
+        m4|a5)  DMUL='-DMUL64_IS_CONSTANT_TIME';;
+        *)      DMUL='';;
+    esac
     printf "\n*** %s ***\n" $CPU
     arm-none-eabi-gcc -Os -mthumb -mcpu=cortex-$CPU p256-m.c entry.c \
         --entry=p256_entry -nostartfiles -o linked.elf
