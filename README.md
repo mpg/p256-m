@@ -116,17 +116,31 @@ reached on selected cores:
 Clang was also tried but tends to generate larger code (by about 10%). For
 details, see `sizes.sh`.
 
+**What's included:**
+
+- Full input validation and (de)serialisation of input/outputs to bytes.
+- Cleaning up secret values from the stack before returning from a function.
+- No dependency on libc functions or even on the toolchain's runtime library
+  (such as helpers for long multiply); this can be checked for the Arm-GCC
+toolchain with the `deps.sh` script.
+
+**What's excluded:**
+
+- A function for secure random number generation has to be provided
+  externally, see `p256_generate_random()` in `p256-m.h`.
+
 ## RAM usage
 
 p256-m doesn't use any dynamic memory (on the heap), only the stack. Here's
-how much stack is used by each of its 4 public functions:
+how much stack is used by each of its 4 public functions on a Cortex-M0 core:
 
 - `p256_gen_keypair`: 664
 - `p256_ecdh_shared_secret`: 672
 - `p256_ecdsa_sign`: 720
 - `p256_ecdsa_verify`: 784
 
-For details, see `stack.sh`, `wcs.py` and `libc.msu`.
+For details, see `stack.sh`, `wcs.py` and `libc.msu` (the above figures assume
+that the externally-provided RNG function uses at most 512 bytes of stack).
 
 ## Runtime performance
 
@@ -164,7 +178,7 @@ branch](https://github.com/mpg/tinycrypt/tree/measurements), based on version
 **RAM usage**
 
 TinyCrypto also uses no heap, only the stack. Here's the RAM used by each
-operation:
+operation on a Cortex-M0 core:
 
 |  | p256-m| TinyCrypt  |
 | --- | --- | --- |
@@ -189,9 +203,9 @@ Timing for each operation in milliseconds, measured on a Raspberry Pi 2
 
 - While p256-m fully validates all inputs, Tinycrypt's ECDH shared secret
   function doesn't include validation of the peer's public key, which should be
-done separately by the user (there are attacks on static ECDH [when users
+done separately by the user for static ECDH (there are attacks [when users
 forget](https://link.springer.com/chapter/10.1007/978-3-319-24174-6_21)).
-- The two implementation have slightly different security characteristics:
+- The two implementations have slightly different security characteristics:
   p256-m is fully constant-time from the ground up so should be more robust
 than TinyCrypt against powerful local attackers (such as an untrusted OS
 attacking a secure enclave); on the other hand TinyCrypt includes coordinate

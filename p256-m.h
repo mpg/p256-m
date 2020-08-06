@@ -17,7 +17,7 @@
 #define P256_INVALID_SIGNATURE  -4
 
 /*
- * RNG function - must be provided externally
+ * RNG function - must be provided externally and be cryptographically secure.
  *
  * in: output - must point to a writable buffer of at least output_size bytes.
  *     output_size - the number of random bytes to write to output.
