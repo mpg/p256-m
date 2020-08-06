@@ -339,4 +339,93 @@ top of the file.
 
 ## What about other curves?
 
-**TODO**
+It should be clear that minimal code size can only be reached by specializing
+the implementation to the curve at hand. Here's a list
+of things in the implementation that are specific to the NIST P-256 curve, and
+how the implementation could be changed to expand to other curves, layer by
+layer (see "Design Overview" above).
+
+**Fixed-width multi-precision arithmetic:**
+
+- The number of limbs is hard-coded to 8. For other 256-bit curves, nothing to
+  change. For a curve of another size, hard-code to another value. For multiple
+curves of various sizes, add a parameter to each function specifying the
+number of limbs; when declaring arrays, always use the maximum number of
+limbs.
+
+**Fixed-width modular arithmetic:**
+
+- The values of the curve's constant p and n, and their associated Montgomery
+  constants, are hard-coded. For another curve, just hard-code the new constants.
+For multiple other curves, define all the constants, and from this layer's API
+only keep the functions that already accept a `mod` parameter (that is, remove
+convenience functions `m256_xxx_p()`).
+- The number of limbs is again hard-coded to 8. See above, but it order to
+  support multiple sizes there is no need to add a new parameter to functions
+in this layer: the existing `mod` parameter can include the number of limbs as
+well.
+
+**Operations on curve points:**
+
+- The values of the curve's constants b (constant term from the equation) and
+  gx, gy (coordinates of the base point) are hard-coded. For another curve,
+  hard-code the other values. For multiple curves, define each curve's value and
+add a "curve id" parameter to all functions in this layer.
+- The value of the curve's constant a is implicitly hard-coded to `-3` by using
+  a standard optimisation to save one multiplication in the first step of
+`point_double()`. For curves that don't have a == -3, replace that with the
+normal computation.
+- The fact that b != 0 in the curve equation is used indirectly, to ensure
+  that (0, 0) is not a point on the curve and re-use that value to represent
+the point 0. As far as I know, all Short Weierstrass curves standardized so
+far have b != 0.
+- The shape of the curve is assumed to be Short Weierstrass. For other curve
+  shapes (Montgomery, (twisted) Edwards), this layer would probably look very
+different (both implementation and API).
+
+**Scalar operations:**
+
+- If multiple curves are to be supported, all function in this layer need to
+  gain a new "curve id" parameter.
+- This layer assumes that the bit size of the curve's order n is the same as
+  that of the modulus p. This is true of most curves standardized so far, the
+only exception being secp224k1. If that curve were to be supported, the
+representation of `n` and scalars would need adapting to allow for an extra
+limb.
+- The bit size of the curve's order is hard-coded in `scalar_mult()`. For
+  multiple curves, this should be deduced from the "curve id" parameter.
+- The `scalar_mult()` function exploits the fact that the second least
+  significant bit of the curve's order n is set in order to avoid a special
+case. For curve orders that don't meet this criterion, we can just handle that
+special case (multiplication by +-2) separately (always compute that and
+conditionally assign it to the result).
+- The shape of the curve is again assumed to be Short Weierstrass. For other curve
+  shapes (Montgomery, (twisted) Edwards), this layer would probably have a
+very different implementation.
+
+**Public API:**
+
+- For multiple curves, all functions in this layer would need to gain a "curve
+  id" parameter and handle variable-sized input/output.
+- The shape of the curve is again assumed to be Short Weierstrass. For other curve
+  shapes (Montgomery, (twisted) Edwards), the ECDH API would probably look
+quite similar (with differences in the size of public keys), but the ECDSA API
+wouldn't apply and an EdDSA API would look pretty different.
+
+## What about other platforms?
+
+While p256-m is standard C99, it is written with constrained 32-bit platforms
+in mind and makes a few assumptions about the platform:
+
+- The types `uint8_t`, `uint16_t`, `uint32_t` and `uint64_t` exist.
+- 32-bit unsigned addition and subtraction with carry are constant time.
+- 16x16->32-bit unsigned multiplication is available and constant time.
+
+Also, on platforms on which 64-bit addition and subtraction with carry, or
+even 64x64->128-bit multiplication, are available, p256-m makes no use of
+them, though they could significantly improve performance.
+
+This could be improved by replacing uses of arrays of `uint32_t` with a
+defined type throughout the internal APIs, and then on 64-bit platforms define
+that type to be an array of `uint64_t` instead, and making the obvious
+adaptations in the multi-precision arithmetic layer.

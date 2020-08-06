@@ -960,7 +960,7 @@ static void scalar_mult(uint32_t rx[8], uint32_t ry[8],
      * positive integer, and for the upper bound we distinguish three cases.
      *
      * If i > 1, then s_i < 2^254, so 2 s_i < 2^255 < n-1.
-     * Otherwise, i == 1 and we have 2 s_i = s_odd - * sbit(b1).
+     * Otherwise, i == 1 and we have 2 s_i = s_odd - sbit(b1).
      *      If s_odd <= n-4, then 2 s_1 <= n-3.
      *      Otherwise, s_odd = n-2, and for this curve's value of n,
      *      we have b1 == 1, so sbit(b1) = 1 and 2 s_1 <= n-3.
