@@ -169,35 +169,35 @@ branch](https://github.com/mpg/tinycrypt/tree/measurements), based on version
 
 **Code size**
 
-|  | p256-m| TinyCrypt  |
-| --- | --- | --- |
-| Cortex-M0 core | 3000 | 6134 |
-| Cortex-M4 core | 2920 | 5934 |
-| Cortex-A5 core | 2928 | 5934 |
+|                | p256-m | TinyCrypt |
+| -------------- | -----: | --------: |
+| Cortex-M0 core |   3000 |      6134 |
+| Cortex-M4 core |   2920 |      5934 |
+| Cortex-A5 core |   2928 |      5934 |
 
 **RAM usage**
 
 TinyCrypto also uses no heap, only the stack. Here's the RAM used by each
 operation on a Cortex-M0 core:
 
-|  | p256-m| TinyCrypt  |
-| --- | --- | --- |
-| key generation | 664 | 824 |
-| ECDH shared secret | 672 | 736 |
-| ECDSA sign | 720 | 888 |
-| ECDSA verify | 784 | 824 |
+|                    | p256-m | TinyCrypt |
+| ------------------ | -----: | --------: |
+| key generation     |    664 |       824 |
+| ECDH shared secret |    672 |       736 |
+| ECDSA sign         |    720 |       888 |
+| ECDSA verify       |    784 |       824 |
 
 **Runtime performance**
 
 Timing for each operation in milliseconds, measured on a Raspberry Pi 2
 (Cortex-A7 core) running Raspbian Buster:
 
-|  | p256-m | TinyCrypt |
-| --- | --- | --- |
-| key generation | 14 | 14 |
-| ECDH shared secret | 14 | 14 |
-| ECDSA sign | 15 | 14 |
-| ECDSA verify | 29 | 16 |
+|                    | p256-m | TinyCrypt |
+| ------------------ | -----: | --------: |
+| key generation     |     14 |        14 |
+| ECDH shared secret |     14 |        14 |
+| ECDSA sign         |     15 |        14 |
+| ECDSA verify       |     29 |        16 |
 
 **Other differences**
 
