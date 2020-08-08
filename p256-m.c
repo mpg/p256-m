@@ -1108,6 +1108,19 @@ cleanup:
  **********************************************************************/
 
 /*
+ * Reduction mod n of a small number
+ *
+ * in: x in [0, 2^256)
+ * out: x_out = x_in mod n in [0, n)
+ */
+static void ecdsa_m256_mod_n(uint32_t x[8])
+{
+    uint32_t t[8];
+    uint32_t c = u256_sub(t, x, p256_n.m);
+    u256_cmov(x, t, 1 - c);
+}
+
+/*
  * Import integer mod n (Montgomery domain) from hash
  *
  * in: h = h0, ..., h_hlen
@@ -1135,9 +1148,7 @@ static void ecdsa_m256_from_hash(uint32_t z[8],
     }
 
     /* ensure the result is in [0, n) */
-    uint32_t t[8];
-    uint32_t c = u256_sub(t, z, p256_n.m);
-    u256_cmov(z, t, 1 - c);
+    ecdsa_m256_mod_n(z);
 
     /* map to Montgomery domain */
     m256_prep(z, &p256_n);
@@ -1175,8 +1186,7 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
     m256_done(xr, &p256_p);
 
     /* 3. Reduce xr mod n (extra: output it while at it) */
-    uint32_t c = u256_sub(t3, xr, p256_n.m);
-    u256_cmov(xr, t3, 1 - c);                   /* xr = int(xr) mod n */
+    ecdsa_m256_mod_n(xr);    /* xr = int(xr) mod n */
 
     /* xr is public data so it's OK to use a branch */
     if (u256_diff0(xr) == 0)
@@ -1283,8 +1293,7 @@ int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
     m256_done(u1, &p256_p);
 
     /* 7. Reduce xR mod n */
-    uint32_t c = u256_sub(u2, u1, p256_n.m);
-    u256_cmov(u1, u2, 1 - c);
+    ecdsa_m256_mod_n(u1);
 
     /* 8. Compare xR mod n to r */
     uint32_t diff = u256_diff(u1, r);

@@ -568,6 +568,31 @@ static void assert_gen_keypair(void)
  * ECDSA
  */
 
+static void assert_ecdsa_mod_n(void)
+{
+    uint32_t z[8];
+
+    /* less than n */
+    u256_cmov(z, r, 1);
+    ecdsa_m256_mod_n(z);
+    assert(memcmp(z, r, sizeof z) == 0);
+
+    /* just less than n: equal to n-1 */
+    u256_cmov(z, nm1, 1);
+    ecdsa_m256_mod_n(z);
+    assert(memcmp(z, nm1, sizeof z) == 0);
+
+    /* equal to n */
+    u256_cmov(z, p256_n.m, 1);
+    ecdsa_m256_mod_n(z);
+    assert(memcmp(z, zero, sizeof z) == 0);
+
+    /* larger than n */
+    u256_cmov(z, p256_p.m, 1);
+    ecdsa_m256_mod_n(z);
+    assert(memcmp(z, pmn, sizeof z) == 0);
+}
+
 static void assert_ecdsa_from_hash(void)
 {
     uint32_t z[8];
@@ -692,6 +717,7 @@ int main(void)
     assert_gen_keypair();
 
     /* ecdsa */
+    assert_ecdsa_mod_n();
     assert_ecdsa_from_hash();
     assert_ecdsa_sign();
 }
