@@ -13,7 +13,20 @@ or correctness for speed. p256-m was written because I wanted to see what
 happened when reversing the usual emphasis.
 
 The result is a full implementation of ECDH and ECDSA in **less than 3KiB of
-code, using less than 800 bytes of RAM** (in less than 600 LOC).
+code**, using **no more than 800 bytes of RAM**, with performance comparable
+to existing implementations - in less than 600 LOC.
+
+Contents of this Readme:
+
+- [Correctness](#correctness)
+- [Security](#security)
+- [Code size](#code-size)
+- [RAM usage](#ram-usage)
+- [Runtime performance](#runtime-performance)
+- [Comparison with other implementations](#comparison-with-other-implementations)
+- [Design overview](#design-overview)
+- [Notes about other curves](#notes-about-other-curves)
+- [Notes about other platforms](#notes-about-other-platforms)
 
 ## Correctness
 
@@ -215,7 +228,7 @@ paper](https://www.esat.kuleuven.be/cosic/publications/article-2293.pdf#page=12)
 which p256-m completely ignores.
 - TinyCrypt's code looks like it could easily be expanded to support other
   curves, while p256-m has much more hard-coded to minimize code size (see
-"What about other curves?" below).
+"Notes about other curves" below).
 - TinyCrypt uses a specialised routine for reduction modulo the curve prime,
   exploiting its structure as a Solinas prime, which should be faster than the
 generic Montgomery reduction used by p256-m, but other factors appear to
@@ -337,13 +350,13 @@ allow either valgrind or MemSan to check that no branch or memory access
 depends on it (even indirectly). Macros are defined for this purpose near the
 top of the file.
 
-## What about other curves?
+## Notes about other curves
 
 It should be clear that minimal code size can only be reached by specializing
-the implementation to the curve at hand. Here's a list
-of things in the implementation that are specific to the NIST P-256 curve, and
-how the implementation could be changed to expand to other curves, layer by
-layer (see "Design Overview" above).
+the implementation to the curve at hand. Here's a list of things in the
+implementation that are specific to the NIST P-256 curve, and how the
+implementation could be changed to expand to other curves, layer by layer (see
+"Design Overview" above).
 
 **Fixed-width multi-precision arithmetic:**
 
@@ -412,7 +425,7 @@ very different implementation.
 quite similar (with differences in the size of public keys), but the ECDSA API
 wouldn't apply and an EdDSA API would look pretty different.
 
-## What about other platforms?
+## Notes about other platforms
 
 While p256-m is standard C99, it is written with constrained 32-bit platforms
 in mind and makes a few assumptions about the platform:
