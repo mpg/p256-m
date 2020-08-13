@@ -175,12 +175,115 @@ static uint32_t u256_diff0(const uint32_t x[8])
  * out: x * y + z + t in [0, 2^64)
  *
  * Note: this computation cannot overflow.
+ *
+ * Note: this function has two pure-C implementations (depending on whether
+ * MUL64_IS_CONSTANT_TIME), and possibly optimised asm implementations.
+ * Start with the potential asm definitions, and use the C definition only if
+ * there we no have no asm for the current toolchain & CPU.
  */
+static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t);
+
+/* This macro is used to mark whether an asm implentation is found */
+#undef MULADD64_ASM
+
+/*
+ * Currently assembly optimisations are only supported with GCC for
+ * Arm's Cortex-M line of CPUs, which starts with the v6-M architecture.
+ *
+ * (I can't get naked functions with parameters to compile without warnings
+ * with Clang, so this is strictly GCC for now.)
+ */
+#if defined(__GNUC__) && !defined(__clang__) && \
+    defined(__ARM_ARCH) && __ARM_ARCH >= 6 && \
+    defined(__ARM_ARCH_PROFILE) && __ARM_ARCH_PROFILE == 77 /* 'M' */
+
+/*
+ * The Cortex-M line of CPUs is conveniently partitioned as follows:
+ *
+ * 1. Cores that have the DSP extension, which includes a 1-cycle UMAAL
+ *    instruction: M4, M7, M33.
+ * 2. Cores that don't have the DSP extension, and also lack a constant-time
+ *    64-bit multiplication instruction:
+ *    - M0, M0+, M23: 32-bit multiplication only;
+ *    - M3: 64-bit multiplication is not constant-time.
+ */
+#if defined(__ARM_FEATURE_DSP)
+
+/* TODO: implementation using UMAAL */
+
+#else /* __ARM_FEATURE_DSP */
+/*
+ * This implementation only uses 16x16->32 bit multiplication.
+ *
+ * It decomposes the multiplicands as:
+ *      x = xh:xl = 2^16 * xh + xl
+ *      y = yh:yl = 2^16 * yh + yl
+ * and computes their product as:
+ *      x*y = xl*yl + 2**16 (xh*yl + yl*yh) + 2**32 xh*yh
+ * then adds z and t to the result.
+ */
+__attribute__((naked))
 static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
 {
+    (void) x; /* r0 */ /* x = xh:xl = 2^16 * xh + xl */
+    (void) y; /* r1 */ /* y = yh:yl = 2^16 * yh + yl */
+    (void) z; /* r2 */
+    (void) t; /* r3 */
+    __asm__(
+        ".syntax unified\n\t"
+        /* save z and t for later, we'll focus on x * y for starters */
+        "push    {r2, r3}\n\t"
+        /* make r4 available as a scratch register */
+        "mov     r12, r4\n\t"
+        /* start by splitting the inputs into halves */
+        "lsrs    r2, r0, #16\n\t"
+        "lsrs    r3, r1, #16\n\t"
+        "uxth    r0, r0\n\t"
+        "uxth    r1, r1\n\t"
+        /* now we have r0, r1, r2, r3 = xl, yl, xh, yh */
+        /* let's compute the 4 products we can form with those */
+        "movs    r4, r3\n\t"
+        "muls    r4, r2\n\t"
+        "muls    r3, r0\n\t"
+        "muls    r0, r1\n\t"
+        "muls    r1, r2\n\t"
+        /* now we have r0, r1, r3, r4 = xl*yl, xh*yl, xl*yh, xh*yh and r2 is free */
+        /* let's split and add the first middle product, accumulating in r1:r0 */
+        "lsls    r2, r1, #16\n\t"
+        "lsrs    r1, r1, #16\n\t"
+        "adds    r0, r2\n\t"
+        "adcs    r1, r4\n\t"
+        /* let's finish with the second middle product */
+        "lsls    r2, r3, #16\n\t"
+        "lsrs    r3, r3, #16\n\t"
+        "adds    r0, r2\n\t"
+        "adcs    r1, r3\n\t"
+        /* done with the mul64 part, now accumulate the rest */
+        "pop     {r2, r3}\n\t"
+        "movs    r4, #0\n\t"
+        "adds    r0, r2\n\t"
+        "adcs    r1, r4\n\t"
+        "adds    r0, r3\n\t"
+        "adcs    r1, r4\n\t"
+        /* done, restore r4 and return */
+        "mov     r4, r12\n\t"
+        "bx      lr\n\t"
+    );
+}
+#define MULADD64_ASM
+#endif /* __ARM_FEATURE_DSP */
+
+#endif /* GCC/Clang with Cortex-M CPU */
+
+#if !defined(MULADD64_ASM)
 #if defined(MUL64_IS_CONSTANT_TIME)
+static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
+{
     return (uint64_t) x * y + z + t;
+}
 #else
+static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
+{
     /* x = xl + 2**16 xh, y = yl + 2**16 yh */
     const uint16_t xl = (uint16_t) x;
     const uint16_t yl = (uint16_t) y;
@@ -201,8 +304,9 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
     acc += t;
 
     return acc;
-#endif /* MUL64_IS_CONSTANT_TIME */
 }
+#endif /* MUL64_IS_CONSTANT_TIME */
+#endif /* MULADD64_ASM */
 
 /*
  * 288 + 32 x 256 -> 288-bit multiply and add
