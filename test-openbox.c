@@ -53,6 +53,44 @@ static void assert_ubytes(void)
     assert(memcmp(p, rbytes, sizeof p) == 0);
 }
 
+static const uint16_t ma64_half[] = {
+    0x0000,
+    0x0001,
+    0xfffe,
+    0xffff,
+};
+
+static const uint32_t ma64_full[] = {
+    0x00000000,
+    0x00000001,
+    0xfffffffe,
+    0xffffffff,
+};
+
+#define ARRLEN(x)       (sizeof x / sizeof x[0])
+
+static void assert_muladd64()
+{
+    for (unsigned i = 0; i < ARRLEN(ma64_half); i++)
+        for (unsigned j = 0; j < ARRLEN(ma64_half); j++)
+            for (unsigned k = 0; k < ARRLEN(ma64_half); k++)
+                for (unsigned l = 0; l < ARRLEN(ma64_half); l++)
+                    for (unsigned m = 0; m < ARRLEN(ma64_full); m++)
+                        for (unsigned n = 0; n < ARRLEN(ma64_full); n++)
+                        {
+                            uint32_t x = ((uint32_t) ma64_half[i] << 16)
+                                                   + ma64_half[j];
+                            uint32_t y = ((uint32_t) ma64_half[k] << 16)
+                                                   + ma64_half[l];
+                            uint32_t z = ma64_full[m];
+                            uint32_t t = ma64_full[n];
+
+                            uint64_t u = u32_muladd64(x, y, z, t);
+                            uint64_t v = (uint64_t) x * y + z + t;
+                            assert(u == v);
+                        }
+}
+
 static void assert_madd()
 {
     uint32_t z[8];
@@ -694,6 +732,9 @@ int main(void)
     RUN(assert_sub(s, r, smr, 1u));
     RUN(assert_cmov());
     RUN(assert_ubytes());
+
+    /* 64-bit multiply */
+    RUN(assert_muladd64());
 
     /* m256 */
     RUN(assert_madd());

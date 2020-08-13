@@ -169,15 +169,17 @@ static uint32_t u256_diff0(const uint32_t x[8])
 }
 
 /*
- * 32 x 32 -> 64-bit multiply
+ * 32 x 32 -> 64-bit multiply-and-accumulate
  *
- * in: x, y in [0, 2^32)
- * out: x * y in [0, 2^64)
+ * in: x, y, z, t in [0, 2^32)
+ * out: x * y + z + t in [0, 2^64)
+ *
+ * Note: this computation cannot overflow.
  */
-static uint64_t u32_mul64(uint32_t x, uint32_t y)
+static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
 {
 #if defined(MUL64_IS_CONSTANT_TIME)
-    return (uint64_t) x * y;
+    return (uint64_t) x * y + z + t;
 #else
     /* x = xl + 2**16 xh, y = yl + 2**16 yh */
     const uint16_t xl = (uint16_t) x;
@@ -195,6 +197,8 @@ static uint64_t u32_mul64(uint32_t x, uint32_t y)
     uint64_t acc = lo + ((uint64_t) (hi + (m1 >> 16) + (m2 >> 16)) << 32);
     acc += m1 << 16;
     acc += m2 << 16;
+    acc += z;
+    acc += t;
 
     return acc;
 #endif /* MUL64_IS_CONSTANT_TIME */
@@ -219,7 +223,7 @@ static uint32_t u288_muladd(uint32_t z[9], uint32_t x, const uint32_t y[8])
     uint32_t carry = 0;
 
     for (unsigned i = 0; i < 8; i++) {
-        uint64_t prod = u32_mul64(x, y[i]) + z[i] + carry;
+        uint64_t prod = u32_muladd64(x, y[i], z[i], carry);
         z[i] = (uint32_t) prod;
         carry = (uint32_t) (prod >> 32);
     }
