@@ -8,6 +8,7 @@
 
 #include "p256-m.h"
 #include "test-data.h"
+#include "test-common.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -215,9 +216,13 @@ static void assert_gen_keypair(void)
 
 int main(void)
 {
-    assert_ecdsa_verify();
-    assert_ecdsa_sign();
+    PUTS("\np256-m closed-box test suite");
 
-    assert_ecdh_shared();
-    assert_gen_keypair();
+    RUN(assert_ecdsa_verify());
+    RUN(assert_ecdsa_sign());
+
+    RUN(assert_ecdh_shared());
+    RUN(assert_gen_keypair());
+
+    PUTS("PASSED");
 }

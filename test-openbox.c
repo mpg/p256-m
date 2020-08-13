@@ -7,6 +7,7 @@
 
 #include "p256-m.c"
 #include "test-data.h"
+#include "test-common.h"
 
 #include <stdio.h>
 #include <assert.h>
@@ -682,42 +683,46 @@ static void assert_ecdsa_sign(void)
 
 int main(void)
 {
+    PUTS("\np256-m open-box test suite");
+
     /* testing the test RNG */
-    assert_rng_for_tests();
+    RUN(assert_rng_for_tests());
 
     /* u256 */
-    assert_add(r, s, rps, 0u);
-    assert_sub(r, s, rms, 0u);
-    assert_sub(s, r, smr, 1u);
-    assert_cmov();
-    assert_ubytes();
+    RUN(assert_add(r, s, rps, 0u));
+    RUN(assert_sub(r, s, rms, 0u));
+    RUN(assert_sub(s, r, smr, 1u));
+    RUN(assert_cmov());
+    RUN(assert_ubytes());
 
     /* m256 */
-    assert_madd();
-    assert_msub();
-    assert_mmul();
-    assert_prep_mul_done();
-    assert_inv();
-    assert_mbytes();
+    RUN(assert_madd());
+    RUN(assert_msub());
+    RUN(assert_mmul());
+    RUN(assert_prep_mul_done());
+    RUN(assert_inv());
+    RUN(assert_mbytes());
 
     /* point */
-    assert_pt_params();
-    assert_pt_check();
-    assert_pt_affine();
-    assert_pt_double();
-    assert_pt_add();
-    assert_pt_add_or_double();
-    assert_pt_bytes();
+    RUN(assert_pt_params());
+    RUN(assert_pt_check());
+    RUN(assert_pt_affine());
+    RUN(assert_pt_double());
+    RUN(assert_pt_add());
+    RUN(assert_pt_add_or_double());
+    RUN(assert_pt_bytes());
 
     /* scalar */
-    assert_scalar_mult();
-    assert_sbytes();
+    RUN(assert_scalar_mult());
+    RUN(assert_sbytes());
 
     /* ecdh */
-    assert_gen_keypair();
+    RUN(assert_gen_keypair());
 
     /* ecdsa */
-    assert_ecdsa_mod_n();
-    assert_ecdsa_from_hash();
-    assert_ecdsa_sign();
+    RUN(assert_ecdsa_mod_n());
+    RUN(assert_ecdsa_from_hash());
+    RUN(assert_ecdsa_sign());
+
+    PUTS("PASSED");
 }
