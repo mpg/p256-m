@@ -1,5 +1,5 @@
 /*
- * Black-box testing of curve P-256 (ECDH and ECDSA)
+ * Closed-box testing of curve P-256 (ECDH and ECDSA)
  *
  * - validate determinstic public functions against standard test vectors
  * - validate non-deterministic public functions against other functions

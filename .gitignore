@@ -1,6 +1,6 @@
 benchmark
-test-whitebox
-test-blackbox
+test-openbox
+test-closedbox
 test-data.h
 *.o
 *.s

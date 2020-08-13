@@ -1,5 +1,5 @@
 /*
- * White-box testing of curve P-256 (ECDH and ECDSA)
+ * Open-box testing of curve P-256 (ECDH and ECDSA)
  *
  * - unit-tests for static function (by including the C file)
  * - tests using a fixed RNG (and knowledge of how it's used)

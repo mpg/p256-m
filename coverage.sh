@@ -3,15 +3,15 @@
 set -eu
 
 make clean
-make CC=gcc CFLAGS='-Werror -Wall -Wextra -O1 -g3 --coverage' test-blackbox test-whitebox
+make CC=gcc CFLAGS='-Werror -Wall -Wextra -O1 -g3 --coverage' test-closedbox test-openbox
 
 LCOV_FLAGS="--directory . --rc lcov_branch_coverage=1 --no-external"
 
-./test-blackbox
-lcov $LCOV_FLAGS --exclude $PWD/'test-*.c' --capture --output-file black.info
-./test-whitebox
-lcov $LCOV_FLAGS --exclude $PWD/'test-*.c' --capture --output-file white.info
+./test-closedbox
+lcov $LCOV_FLAGS --exclude $PWD/'test-*.c' --capture --output-file closed.info
+./test-openbox
+lcov $LCOV_FLAGS --exclude $PWD/'test-*.c' --capture --output-file open.info
 
-genhtml --branch-coverage black.info -o cov-black
-genhtml --branch-coverage white.info -o cov-white
+genhtml --branch-coverage closed.info -o cov-closed
+genhtml --branch-coverage open.info -o cov-open
 

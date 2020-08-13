@@ -42,11 +42,11 @@ Contents of this Readme:
   NIST.
 - In addition, crafted inputs are used for negative testing and to reach
   corner cases.
-- Two test suites are provided: one for black-box testing (using only the
-  public API), one for white-box testing (for unit-testing internal functions,
+- Two test suites are provided: one for closed-box testing (using only the
+  public API), one for open-box testing (for unit-testing internal functions,
 and reaching more error cases by exploiting knowledge of how the RNG is used).
-- The resulting branch coverage is maximal: black-box testing reaches all
-  branches except four; three of them are reached by white-box testing using a
+- The resulting branch coverage is maximal: closed-box testing reaches all
+  branches except four; three of them are reached by open-box testing using a
 rigged RNG; the last branch could only be reached by computing a discrete log
 on P-256... See `coverage.sh`.
 - Testing also uses dynamic analysis: valgrind, ASan, MemSan, UBSan.
@@ -342,8 +342,8 @@ various sources are embedded and used to validate the implementation.
 
 This implementation, `p256.py`, is used by a second Python script,
 `gen-test-data.py`, to generate additional data for both positive and negative
-testing, available from a C header file, that is then used by the black-box
-and white-box test programs.
+testing, available from a C header file, that is then used by the closed-box
+and open-box test programs.
 
 p256-m can be compiled with extra instrumentation to mark secret data and
 allow either valgrind or MemSan to check that no branch or memory access
