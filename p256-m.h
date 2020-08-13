@@ -5,6 +5,8 @@
  * Copyright Manuel Pégourié-Gonnard.
  * All rights reserved.
  */
+#ifndef P256_M_H
+#define P256_M_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -15,6 +17,10 @@
 #define P256_INVALID_PUBKEY     -2
 #define P256_INVALID_PRIVKEY    -3
 #define P256_INVALID_SIGNATURE  -4
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * RNG function - must be provided externally and be cryptographically secure.
@@ -82,3 +88,9 @@ int p256_ecdsa_sign(uint8_t sig[64], const uint8_t priv[32],
  */
 int p256_ecdsa_verify(const uint8_t sig[64], const uint8_t pub[64],
                       const uint8_t *hash, size_t hlen);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* P256_M_H */
