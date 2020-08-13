@@ -1,4 +1,4 @@
-All the files in this repository, except wcs.py, are:
+All the files in this repository, except wcs.py and on-target-*/mbed*, are:
 
 Copyright Manuel Pégourié-Gonnard.
 All rights reserved.
