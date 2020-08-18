@@ -27,7 +27,7 @@ $(TESTDATA): gen-test-data.py p256.py
 
 all: runtest
 	./sizes.sh
-	./stack.sh | sed -n 's/^..p256-m.c *p256_/p256_/p'
+	./stack.sh
 
 clean:
 	rm -f $(TESTCLOSED) $(TESTOPEN) $(TESTDATA)
