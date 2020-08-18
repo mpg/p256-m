@@ -209,9 +209,20 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t);
  */
 #if defined(__ARM_FEATURE_DSP)
 
-/* TODO: implementation using UMAAL */
+static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
+{
+    __asm__(
+        /* UMAAL <RdLo>, <RdHi>, <Rn>, <Rm> */
+        "umaal   %[z], %[t], %[x], %[y]"
+        : [z] "+l" (z), [t] "+l" (t)
+        : [x] "l" (x), [y] "l" (y)
+    );
+    return ((uint64_t) t << 32) | z;
+}
+#define MULADD64_ASM
 
 #else /* __ARM_FEATURE_DSP */
+
 /*
  * This implementation only uses 16x16->32 bit multiplication.
  *
@@ -271,6 +282,7 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
     );
 }
 #define MULADD64_ASM
+
 #endif /* __ARM_FEATURE_DSP */
 
 #endif /* GCC/Clang with Cortex-M CPU */
