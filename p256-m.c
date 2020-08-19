@@ -233,53 +233,59 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
  *      x*y = xl*yl + 2**16 (xh*yl + yl*yh) + 2**32 xh*yh
  * then adds z and t to the result.
  */
-__attribute__((naked))
 static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
 {
-    (void) x; /* r0 */ /* x = xh:xl = 2^16 * xh + xl */
-    (void) y; /* r1 */ /* y = yh:yl = 2^16 * yh + yl */
-    (void) z; /* r2 */
-    (void) t; /* r3 */
+    /* First compute x*y, using 3 temporary registers */
+    uint32_t tmp1, tmp2, tmp3;
     __asm__(
         ".syntax unified\n\t"
-        /* save z and t for later, we'll focus on x * y for starters */
-        "push    {r2, r3}\n\t"
-        /* make r4 available as a scratch register */
-        "mov     r12, r4\n\t"
         /* start by splitting the inputs into halves */
-        "lsrs    r2, r0, #16\n\t"
-        "lsrs    r3, r1, #16\n\t"
-        "uxth    r0, r0\n\t"
-        "uxth    r1, r1\n\t"
-        /* now we have r0, r1, r2, r3 = xl, yl, xh, yh */
+        "lsrs    %[u], %[x], #16\n\t"
+        "lsrs    %[v], %[y], #16\n\t"
+        "uxth    %[x], %[x]\n\t"
+        "uxth    %[y], %[y]\n\t"
+        /* now we have %[x], %[y], %[u], %[v] = xl, yl, xh, yh */
         /* let's compute the 4 products we can form with those */
-        "movs    r4, r3\n\t"
-        "muls    r4, r2\n\t"
-        "muls    r3, r0\n\t"
-        "muls    r0, r1\n\t"
-        "muls    r1, r2\n\t"
-        /* now we have r0, r1, r3, r4 = xl*yl, xh*yl, xl*yh, xh*yh and r2 is free */
-        /* let's split and add the first middle product, accumulating in r1:r0 */
-        "lsls    r2, r1, #16\n\t"
-        "lsrs    r1, r1, #16\n\t"
-        "adds    r0, r2\n\t"
-        "adcs    r1, r4\n\t"
+        "movs    %[w], %[v]\n\t"
+        "muls    %[w], %[u]\n\t"
+        "muls    %[v], %[x]\n\t"
+        "muls    %[x], %[y]\n\t"
+        "muls    %[y], %[u]\n\t"
+        /* now we have %[x], %[y], %[v], %[w] = xl*yl, xh*yl, xl*yh, xh*yh */
+        /* let's split and add the first middle product */
+        "lsls    %[u], %[y], #16\n\t"
+        "lsrs    %[y], %[y], #16\n\t"
+        "adds    %[x], %[u]\n\t"
+        "adcs    %[y], %[w]\n\t"
         /* let's finish with the second middle product */
-        "lsls    r2, r3, #16\n\t"
-        "lsrs    r3, r3, #16\n\t"
-        "adds    r0, r2\n\t"
-        "adcs    r1, r3\n\t"
-        /* done with the mul64 part, now accumulate the rest */
-        "pop     {r2, r3}\n\t"
-        "movs    r4, #0\n\t"
-        "adds    r0, r2\n\t"
-        "adcs    r1, r4\n\t"
-        "adds    r0, r3\n\t"
-        "adcs    r1, r4\n\t"
-        /* done, restore r4 and return */
-        "mov     r4, r12\n\t"
-        "bx      lr\n\t"
+        "lsls    %[u], %[v], #16\n\t"
+        "lsrs    %[v], %[v], #16\n\t"
+        "adds    %[x], %[u]\n\t"
+        "adcs    %[y], %[v]\n\t"
+        : [x] "+l" (x), [y] "+l" (y),
+          [u] "=&l" (tmp1), [v] "=&l" (tmp2), [w] "=&l" (tmp3)
+        : /* no read-only inputs */
+        : "cc"
     );
+    (void) tmp1;
+    (void) tmp2;
+    (void) tmp3;
+
+    /* Add z and t, using one temporary register */
+    __asm__(
+        ".syntax unified\n\t"
+        "movs    %[u], #0\n\t"
+        "adds    %[x], %[z]\n\t"
+        "adcs    %[y], %[u]\n\t"
+        "adds    %[x], %[t]\n\t"
+        "adcs    %[y], %[u]\n\t"
+        : [x] "+l" (x), [y] "+l" (y), [u] "=&l" (tmp1)
+        : [z] "l" (z), [t] "l" (t)
+        : "cc"
+    );
+    (void) tmp1;
+
+    return ((uint64_t) y << 32) | x;
 }
 #define MULADD64_ASM
 
