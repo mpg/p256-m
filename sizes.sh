@@ -18,7 +18,7 @@ clang() {
 OBJECTS=''
 
 for CC in gcc clang; do
-    for CPU in m0 m4 a5; do
+    for CPU in m0 m4 a7; do
         NAME="${CC}-${CPU}"
         $CC -mcpu=cortex-$CPU -S -fverbose-asm -o ${NAME}.s
         $CC -mcpu=cortex-$CPU -c -o ${NAME}.o

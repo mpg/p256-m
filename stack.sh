@@ -1,6 +1,6 @@
 #!/bin/sh
 
-for CPU in m0 m4 a5; do
+for CPU in m0 m4 a7; do
     echo "*** $CPU ***"
     arm-none-eabi-gcc -c -fdump-rtl-dfinish -fstack-usage \
         -Os -fomit-frame-pointer -mthumb -mcpu=cortex-$CPU \
