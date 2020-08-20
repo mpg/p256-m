@@ -51,7 +51,7 @@ int cmp_u64(const void *a, const void *b) {
 int main(void)
 {
     uint8_t priv[32], pub[64], secret[32], sig[64], hash[32];
-    uint64_t results[4][RUNS];
+    uint64_t results[4][RUNS], total = 0;
     const char * names[4] = {"Keygen", "ECDH", "Sign", "Verify"};
 
     for (unsigned i = 0; i < RUNS; i++) {
@@ -63,8 +63,11 @@ int main(void)
 
     for (unsigned n = 0; n < 4; n++) {
         qsort(results[n], RUNS, sizeof results[n][0], cmp_u64);
-        printf("%s: %"PRIu64"\n", names[n], results[n][RUNS / 2]);
+        uint64_t median = results[n][RUNS / 2];
+        printf("%s: %"PRIu64" us\n", names[n], median);
+        total += median;
     }
+    printf("%s: %"PRIu64" us\n", "Total", total);
 
     return 0;
 }
