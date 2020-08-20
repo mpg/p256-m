@@ -3,11 +3,21 @@
 set -eu
 
 CPU_LIST='m0 m0plus m3 m4 m7 m23 m33'
+# v7-A cores
+#CPU_LIST='a5 a7 a8 a9 a12 a15 a17'
+# v8-A cores
+#CPU_LIST='a32 a35 a53 a55 a57 a72 a73 a75 a76'
+# pre-cortex cores
+#CPU_LIST='arm1176jzf-s arm10tdmi arm10e arm9tdmi arm9'
 
 for CPU in $CPU_LIST; do
-    arm-none-eabi-gcc -mcpu=cortex-$CPU -mthumb -dM -E - </dev/null |
+    case $CPU in
+        arm*)   FULL_CPU="$CPU";;
+        *)      FULL_CPU="cortex-$CPU";;
+    esac
+    arm-none-eabi-gcc -mcpu=$FULL_CPU -mthumb -dM -E - </dev/null |
         sort > macros-gcc-$CPU.txt
-    clang --target=arm-none-eabi -mcpu=cortex-$CPU -dM -E - </dev/null |
+    clang --target=arm-none-eabi -mcpu=$FULL_CPU -dM -E - </dev/null |
         sort > macros-clang-$CPU.txt
 done
 

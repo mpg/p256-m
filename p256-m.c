@@ -187,21 +187,19 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t);
 #undef MULADD64_ASM
 
 /*
- * Currently assembly optimisations are only supported with GCC for
- * Arm's Cortex-M line of CPUs, which starts with the v6-M architecture.
- *
- * (I can't get naked functions with parameters to compile without warnings
- * with Clang, so this is strictly GCC for now.)
+ * Currently assembly optimisations are only supported with GCC/Clang for
+ * Arm's Cortex-A and Cortex-M lines of CPUs, which start with the v6-M and
+ * v7-M architectures. __ARM_ARCH_PROFILE is not defined for v6 and earlier.
  */
-#if defined(__GNUC__) && !defined(__clang__) && \
-    defined(__ARM_ARCH) && __ARM_ARCH >= 6 && \
-    defined(__ARM_ARCH_PROFILE) && __ARM_ARCH_PROFILE == 77 /* 'M' */
+#if defined(__GNUC__) &&\
+    defined(__ARM_ARCH) && __ARM_ARCH >= 6 && defined(__ARM_ARCH_PROFILE) && \
+    ( __ARM_ARCH_PROFILE == 77 || __ARM_ARCH_PROFILE == 65 ) /* 'M' or 'A' */
 
 /*
- * The Cortex-M line of CPUs is conveniently partitioned as follows:
+ * This set of CPUs is conveniently partitioned as follows:
  *
  * 1. Cores that have the DSP extension, which includes a 1-cycle UMAAL
- *    instruction: M4, M7, M33.
+ *    instruction: M4, M7, M33, all A-class cores.
  * 2. Cores that don't have the DSP extension, and also lack a constant-time
  *    64-bit multiplication instruction:
  *    - M0, M0+, M23: 32-bit multiplication only;
@@ -291,7 +289,7 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
 
 #endif /* __ARM_FEATURE_DSP */
 
-#endif /* GCC/Clang with Cortex-M CPU */
+#endif /* GCC/Clang with Cortex-M/A CPU */
 
 #if !defined(MULADD64_ASM)
 #if defined(MUL64_IS_CONSTANT_TIME)
