@@ -1,22 +1,22 @@
 p256-m is a minimalistic implementation of ECDH and ECDSA on NIST P-256,
-written in standard C with constrained 32-bit environments in mind.
+especially suited to constrained 32-bit environments. It's written in standard
+C, with optional bits of assembly for Arm Cortex-M and Cortex-A CPUs.
 
-Its design is guided by the following goals in that order:
+Its design is guided by the following goals in this order:
 
 1. correctness & security;
 2. low code size & RAM usage;
 3. runtime performance.
 
-Many cryptographic implementations tend to put more emphasis on runtime
-performance than on footprint, and sometimes even risk compromising security
-or correctness for speed. p256-m was written because I wanted to see what
-happened when reversing the usual emphasis.
+Most cryptographic implementations care more about speed than footprint, and
+some might even risk weakening security for more speed. p256-m was written
+because I wanted to see what happened when reversing the usual emphasis.
 
 The result is a full implementation of ECDH and ECDSA in **less than 3KiB of
-code**, using **no more than 800 bytes of RAM**, with performance comparable
-to existing implementations - in less than 600 LOC.
+code**, using **less than 768 bytes of RAM**, with comparable performance
+to existing implementations (see below) - in less than 700 LOC.
 
-Contents of this Readme:
+_Contents of this Readme:_
 
 - [Correctness](#correctness)
 - [Security](#security)
@@ -56,8 +56,8 @@ on P-256... See `coverage.sh`.
 - The code is standard C99; it builds without warnings with `clang
   -Weverything` and `gcc -Wall -Wextra -pedantic`.
 - The code is small and well documented, including internal APIs: with the
-  header file, it's less than 600 lines of code, and more than 600 lines of
-comments.
+  header file, it's less than 700 lines of code, and more lines of comments
+than of code.
 - However it _has not been reviewed_ independently so far, as this is a
   personal project.
 
@@ -85,12 +85,13 @@ behind [ctgrind](https://github.com/agl/ctgrind), see `consttime.sh`.
 
 In addition to avoiding branches and memory accesses depending on secret data,
 p256-m also avoid instructions (or library functions) whose execution time
-depends on the value of operands on common cores. Namely, it never uses
+depends on the value of operands on cores of interest. Namely, it never uses
 integer division, and for multiplication by default it only uses 16x16->32 bit
 unsigned multiplication. On cores which have a constant-time 32x32->64 bit
 unsigned multiplication instruction, the symbol `MUL64_IS_CONSTANT_TIME` can
 be defined by the user at compile-time to take advantage of it in order to
-improve performance and code size.
+improve performance and code size. (On Cortex-M and Cortex-A cores wtih GCC or
+Clang this is not necessary, since inline assembly is used instead.)
 
 As a result, p256-m should be secure against the following classes of attackers:
 
@@ -119,53 +120,71 @@ data on the stack before returning.
 
 Compiled with
 [ARM-GCC 9](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads),
-with `-mthumb -Os -fomit-frame-pointer`, here are samples of code sizes
-reached on selected cores:
+with `-mthumb -Os`, here are samples of code sizes reached on selected cores:
 
-- Cortex-M0 core: 3000 bytes
-- Cortex-M4 core: 2920 bytes
-- Cortex-A5 core: 2928 bytes
+- Cortex-M0: 2988 bytes
+- Cortex-M4: 2900 bytes
+- Cortex-A7: 2924 bytes
 
 Clang was also tried but tends to generate larger code (by about 10%). For
 details, see `sizes.sh`.
 
 **What's included:**
 
-- Full input validation and (de)serialisation of input/outputs to bytes.
+- Full input validation and (de)serialisation of input/outputs to/from bytes.
 - Cleaning up secret values from the stack before returning from a function.
-- No dependency on libc functions or even on the toolchain's runtime library
-  (such as helpers for long multiply); this can be checked for the Arm-GCC
-toolchain with the `deps.sh` script.
+- The code has no dependency on libc functions or the toolchain's runtime
+  library (such as helpers for long multiply); this can be checked for the
+Arm-GCC toolchain with the `deps.sh` script.
 
 **What's excluded:**
 
-- A function for secure random number generation has to be provided
-  externally, see `p256_generate_random()` in `p256-m.h`.
+- A secure RNG function needs to be provided externally, see
+  `p256_generate_random()` in `p256-m.h`.
 
 ## RAM usage
 
 p256-m doesn't use any dynamic memory (on the heap), only the stack. Here's
-how much stack is used by each of its 4 public functions on a Cortex-M0 core:
+how much stack is used by each of its 4 public functions on selected cores:
 
-- `p256_gen_keypair`: 664
-- `p256_ecdh_shared_secret`: 672
-- `p256_ecdsa_sign`: 720
-- `p256_ecdsa_verify`: 784
+| Function                  | Cortex-M0 | Cortex-M4 | Cortex-A7 |
+| ------------------------- | --------: | --------: | --------: |
+| `p256_gen_keypair`        |       608 |       564 |       564 |
+| `p256_ecdh_shared_secret` |       640 |       596 |       596 |
+| `p256_ecdsa_sign`         |       664 |       604 |       604 |
+| `p256_ecdsa_verify`       |       752 |       700 |       700 |
 
 For details, see `stack.sh`, `wcs.py` and `libc.msu` (the above figures assume
-that the externally-provided RNG function uses at most 512 bytes of stack).
+that the externally-provided RNG function uses at most 384 bytes of stack).
 
 ## Runtime performance
 
-Timing for each public function in milliseconds, measured on a Raspberry Pi 2
-(Cortex-A7 core) running Raspbian Buster:
+Here are the timings of each public function in milliseconds measured on
+platforms based on a selection of cores:
 
-- `p256_gen_keypair`: 14 ms
-- `p256_ecdh_shared_secret`: 14 ms
-- `p256_ecdsa_sign`: 15 ms
-- `p256_ecdsa_verify`: 29 ms
+- Cortex-M0 at  48 MHz: STM32F091 board running Mbed OS 6
+- Cortex-M4 at 100 MHz: STM32F411 board running Mbed OS 6
+- Cortex-A7 at 900 MHz: Raspberry Pi 2B running Raspbian Buster
 
-For details, see `bench.sh` and `benchmark.c`.
+| Function                  | Cortex-M0 | Cortex-M4 | Cortex-A7 |
+| ------------------------- | --------: | --------: | --------: |
+| `p256_gen_keypair`        |       921 |       145 |        11 |
+| `p256_ecdh_shared_secret` |       922 |       144 |        11 |
+| `p256_ecdsa_sign`         |       990 |       155 |        12 |
+| `p256_ecdsa_verify`       |      1976 |       309 |        24 |
+| Sum of the above          |      4809 |       753 |        59 |
+
+The sum of these operations corresponds to a TLS handshake using ECDHE-ECDSA
+with mutual authentication based on raw public keys or directly-trusted
+certificates (otherwise, add one 'verify' for each link in the peer's
+certificate chain).
+
+_Note_: the above figures where obtained by compiling with GCC, which is able
+to use inline assembly. Without that inline assembly (22 lines for Cortex-M0,
+1 line for Cortex-M4), the code would be roughly 2 times slower on those
+platforms. (The effect is much less important on the Cortex-A7 core.)
+
+For details, see `bench.sh`, `benchmark.c` and `on-target-benchmark/`.
 
 ## Comparison with other implementations
 
@@ -182,35 +201,79 @@ branch](https://github.com/mpg/tinycrypt/tree/measurements), based on version
 
 **Code size**
 
-|                | p256-m | TinyCrypt |
-| -------------- | -----: | --------: |
-| Cortex-M0 core |   3000 |      6134 |
-| Cortex-M4 core |   2920 |      5934 |
-| Cortex-A5 core |   2928 |      5934 |
+| Core      | p256-m | TinyCrypt |
+| --------- | -----: | --------: |
+| Cortex-M0 |   2988 |      6134 |
+| Cortex-M4 |   2900 |      5934 |
+| Cortex-A7 |   2924 |      5934 |
 
 **RAM usage**
 
 TinyCrypto also uses no heap, only the stack. Here's the RAM used by each
 operation on a Cortex-M0 core:
 
-|                    | p256-m | TinyCrypt |
+| operation          | p256-m | TinyCrypt |
 | ------------------ | -----: | --------: |
-| key generation     |    664 |       824 |
-| ECDH shared secret |    672 |       736 |
-| ECDSA sign         |    720 |       888 |
-| ECDSA verify       |    784 |       824 |
+| key generation     |    608 |       824 |
+| ECDH shared secret |    640 |       728 |
+| ECDSA sign         |    664 |       880 |
+| ECDSA verify       |    752 |       824 |
+
+On a Cortex-M4 or Cortex-A7 core (identical numbers):
+
+| operation          | p256-m | TinyCrypt |
+| ------------------ | -----: | --------: |
+| key generation     |    564 |       796 |
+| ECDH shared secret |    596 |       700 |
+| ECDSA sign         |    604 |       844 |
+| ECDSA verify       |    700 |       808 |
 
 **Runtime performance**
 
-Timing for each operation in milliseconds, measured on a Raspberry Pi 2
-(Cortex-A7 core) running Raspbian Buster:
+Here are the timings of each operation in milliseconds measured on
+platforms based on a selection of cores:
 
-|                    | p256-m | TinyCrypt |
+_Cortex-M0_ at  48 MHz: STM32F091 board running Mbed OS 6
+
+| Operation          | p256-m | TinyCrypt |
 | ------------------ | -----: | --------: |
-| key generation     |     14 |        14 |
-| ECDH shared secret |     14 |        14 |
-| ECDSA sign         |     15 |        14 |
-| ECDSA verify       |     29 |        16 |
+| Key generation     |    921 |       979 |
+| ECDH shared secret |    922 |       975 |
+| ECDSA sign         |    990 |      1009 |
+| ECDSA verify       |   1976 |      1130 |
+| Sum of those 4     |   4809 |      4093 |
+
+_Cortex-M4_ at 100 MHz: STM32F411 board running Mbed OS 6
+
+| Operation          | p256-m | TinyCrypt |
+| ------------------ | -----: | --------: |
+| Key generation     |    145 |       178 |
+| ECDH shared secret |    144 |       177 |
+| ECDSA sign         |    155 |       188 |
+| ECDSA verify       |    309 |       210 |
+| Sum of those 4     |    753 |       753 |
+
+_Cortex-A7_ at 900 MHz: Raspberry Pi 2B running Raspbian Buster
+
+| Operation          | p256-m | TinyCrypt |
+| ------------------ | -----: | --------: |
+| Key generation     |     11 |        13 |
+| ECDH shared secret |     11 |        13 |
+| ECDSA sign         |     12 |        14 |
+| ECDSA verify       |     24 |        15 |
+| Sum of those 4     |     59 |        55 |
+
+_64-bit Intel_ (i7-6500U at 2.50GHz) laptop running Ubuntu 20.04
+
+Note: results in microseconds (previous benchmarks in milliseconds)
+
+| Operation          | p256-m | TinyCrypt |
+| ------------------ | -----: | --------: |
+| Key generation     |   1060 |      1627 |
+| ECDH shared secret |   1060 |      1611 |
+| ECDSA sign         |   1136 |      1712 |
+| ECDSA verify       |   2279 |      1888 |
+| Sum of those 4     |   5535 |      6838 |
 
 **Other differences**
 
@@ -236,6 +299,9 @@ compensate for that.
 - TinyCrypt uses Co-Z Jacobian formulas for point operation, which should be
   faster (though a bit larger) than the mixed affine-Jacobian formulas
 used by p256-m, but again other factors appear to compensate for that.
+- p256-m uses bits of inline assembly for 64-bit multiplication on the
+  platforms used for benchmarking, while TinyCrypt uses only C (and the
+compiler's runtime library).
 - TinyCrypt uses a specialised routine based on Shamir's trick for
   ECDSA verification, which gives much better performance than the generic
 code that p256-m uses in order to minimize code size.
@@ -257,6 +323,10 @@ Large integers are represented as arrays of `uint32_t` limbs. When carries may
 occur, casts to `uint64_t` are used to nudge the compiler towards using the
 CPU's carry flag. When overflow may occur, functions return a carry flag.
 
+This layer contains optional assembly for Cortex-M and Cortex-A cores, for the
+internal `u32_muladd64()` function, as well as two pure C versions of this
+function, depending on whether `MUL64_IS_CONSTANT_TIME`.
+
 This layer's API consists of:
 
 - addition, subtraction;
@@ -270,7 +340,7 @@ This layer's API consists of:
 All modular operations are done in the Montgomery domain, that is x is
 represented by `x * 2^256 mod m`; integers need to be converted to that domain
 before computations, and back from it afterwards. Montgomery constants
-associated to the curve's p and n are pre-computed and stored static
+associated to the curve's p and n are pre-computed and stored in static
 structures.
 
 Modular inversion is computed using Fermat's little theorem to get
@@ -309,10 +379,10 @@ This layer's API consists of:
 
 The crucial function here is scalar multiplication. It uses a signed binary
 ladder, which is a variant of the good old double-and-add algorithm where an
-addition is performed at each step. Again, care is taken to make sure the
-pre-conditions for the addition formulas are always satisfied. The signed
-binary ladder only works if the scalar is odd; this is ensured by negating
-both the scalar (mod n) and the input point if necessary.
+addition/subtraction is performed at each step. Again, care is taken to make
+sure the pre-conditions for the addition formulas are always satisfied. The
+signed binary ladder only works if the scalar is odd; this is ensured by
+negating both the scalar (mod n) and the input point if necessary.
 
 This layer's API consists of:
 
@@ -349,6 +419,27 @@ p256-m can be compiled with extra instrumentation to mark secret data and
 allow either valgrind or MemSan to check that no branch or memory access
 depends on it (even indirectly). Macros are defined for this purpose near the
 top of the file.
+
+**Tested platforms.**
+
+There are 4 versions of the internal function `u32_muladd64`: two assembly
+versions, for Cortex-M/A cores with or without the DSP extension, and two
+pure-C versions, depending on whether `MUL64_IS_CONSTANT_TIME`.
+
+Tests are run on the following platforms:
+
+- `make` on x64 tests the pure-C version without `MUL64_IS_CONSTANT_TIME`
+  (with Clang).
+- `./consttime.sh` on x64 tests both pure-C versions (with Clang).
+- `make` on Arm v7-A (Raspberry Pi 2) tests the Arm-DSP assembly version (with
+  Clang).
+- `on-target-*box` on boards based on Cortex-M0 and M4 cores test both
+  assembly versions (with GCC).
+
+In addition:
+
+- `sizes.sh` builds the code for three Arm cores with GCC and Clang.
+- `deps.sh` checks for external dependencies with GCC.
 
 ## Notes about other curves
 
@@ -442,3 +533,8 @@ This could be improved by replacing uses of arrays of `uint32_t` with a
 defined type throughout the internal APIs, and then on 64-bit platforms define
 that type to be an array of `uint64_t` instead, and making the obvious
 adaptations in the multi-precision arithmetic layer.
+
+Finally, the optional assembly code (which boosts performance by a factor 2 on
+tested Cortex-M CPUs, while slightly reducing code size and stack usage) is
+currently only available with compilers that support GCC's extended asm
+syntax (which includes GCC and Clang).
