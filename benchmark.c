@@ -1,3 +1,8 @@
+/*
+ * On-host benchmark program. See bench.sh.
+ * See also: on-target-bencmark.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

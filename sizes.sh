@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Print the size of p256-m.o with GCC and Clang on selected cores.
+
 set -eu
 
 SRC=p256-m.c

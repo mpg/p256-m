@@ -1,6 +1,10 @@
 #!/bin/sh
 
-# print generated assembly for 32x32->64 bit unsigned multiplication
+# Print generated assembly for 32x32->64 bit unsigned multiplication.
+#
+# This is a development helper to:
+# 1. Check it the toolchain-provided __aeabi_lmul is contant-time (it isn't).
+# 2. Check if the compiler uses the UMAAL instruction (it doesn't).
 
 set -eu
 

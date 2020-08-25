@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Measure code coverage with open/closed-box testing using gcov/lcov.
+
 set -eu
 
 make clean
@@ -15,3 +17,4 @@ lcov $LCOV_FLAGS --exclude $PWD/'test-*.c' --capture --output-file open.info
 genhtml --branch-coverage closed.info -o cov-closed
 genhtml --branch-coverage open.info -o cov-open
 
+# Leaving outputs for inspection. They're removed by 'make clean'.

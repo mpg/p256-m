@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Compute maximum stack usage on selected cores with GCC.
+
 for CPU in m0 m4 a7; do
     echo "*** $CPU ***"
     arm-none-eabi-gcc -c -fdump-rtl-dfinish -fstack-usage \

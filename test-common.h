@@ -1,5 +1,5 @@
 /*
- * Common macros for both testing files
+ * Common macros for both test-closedbox.c and test-openbox.c.
  */
 #if defined(TEST_VERBOSE)
 #define PUTS    puts

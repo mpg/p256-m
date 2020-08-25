@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Build and run the on-host benchmark program.
+# (See also: on-target-benchmark directory.)
+
 set -eu
 
 # Anything capable of running gcc has CT 64-bit mul in practice

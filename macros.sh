@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Print the values of pre-defined macros of interest on a selection of cores.
+# This is a development helper to investigate how to detect cores/features.
+
 set -eu
 
 CPU_LIST='m0 m0plus m3 m4 m7 m23 m33'

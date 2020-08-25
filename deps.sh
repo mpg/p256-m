@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# print dependencies on libc / compiler's runtime, with sizes
+# Print dependencies on libc / compiler's runtime, with sizes.
 
 set -eu
 

@@ -1,6 +1,10 @@
+/*
+ * See deps.sh - this provides an entry point for the linker.
+ */
+
 #include "p256-m.h"
 
-/* dummy non-randome version just to make the linker happy */
+/* dummy non-random version just to make the linker happy */
 int p256_generate_random(uint8_t *output, unsigned output_size)
 {
     for (unsigned i = 0; i < output_size; i++) {

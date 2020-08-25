@@ -1,6 +1,5 @@
 /*
- * This file is used by toolchain-mul64.sh to be able to examine the
- * implementation of long multiplication used by the toolchain.
+ * See toolchain-mul64.sh.
  */
 #include <stdint.h>
 
