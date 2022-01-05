@@ -179,7 +179,7 @@ static uint32_t u256_diff0(const uint32_t x[8])
  * Note: this function has two pure-C implementations (depending on whether
  * MUL64_IS_CONSTANT_TIME), and possibly optimised asm implementations.
  * Start with the potential asm definitions, and use the C definition only if
- * there we no have no asm for the current toolchain & CPU.
+ * we no have no asm for the current toolchain & CPU.
  */
 static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t);
 
@@ -419,7 +419,7 @@ static void u256_to_bytes(uint8_t p[32], const uint32_t z[8])
  *
  * Inversion is computed using Fermat's little theorem.
  *
- * Assumptions of m:
+ * Assumptions on m:
  * - Montgomery operations require that m is odd.
  * - Fermat's little theorem require it to be a prime.
  * - m256_inv() further requires that m % 2^32 >= 2.
@@ -460,7 +460,7 @@ static const m256_mod p256_p = {
 };
 
 /*
- * Data for Montgomery operations modulo the curve's p
+ * Data for Montgomery operations modulo the curve's n
  */
 static const m256_mod p256_n = {
     {   /* the curve's n */
@@ -1092,7 +1092,7 @@ static void scalar_mult(uint32_t rx[8], uint32_t ry[8],
     for (unsigned i = 255; i > 0; i--) {
         uint32_t bit = (s_odd[i / 32] >> i % 32) & 1;
 
-        /* set (px, py_use) = sbit(bit) P' = sbit(bit) * (-1)^negate P' */
+        /* set (px, py_use) = sbit(bit) P' = sbit(bit) * (-1)^negate P */
         u256_cmov(py_use, py, bit ^ negate);
         u256_cmov(py_use, py_neg, (1 - bit) ^ negate);
 
