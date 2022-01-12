@@ -342,11 +342,21 @@ static uint32_t u288_muladd(uint32_t z[9], uint32_t x, const uint32_t y[8])
 {
     uint32_t carry = 0;
 
-    for (unsigned i = 0; i < 8; i++) {
-        uint64_t prod = u32_muladd64(x, y[i], z[i], carry);
-        z[i] = (uint32_t) prod;
-        carry = (uint32_t) (prod >> 32);
-    }
+    //for (unsigned i = 0; i < 8; i++) {
+#define STEP(i) \
+    do { \
+        uint64_t prod = u32_muladd64(x, y[i], z[i], carry); \
+        z[i] = (uint32_t) prod; \
+        carry = (uint32_t) (prod >> 32); \
+    } while( 0 )
+    STEP(0);
+    STEP(1);
+    STEP(2);
+    STEP(3);
+    STEP(4);
+    STEP(5);
+    STEP(6);
+    STEP(7);
 
     uint64_t sum = (uint64_t) z[8] + carry;
     z[8] = (uint32_t) sum;
