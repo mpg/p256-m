@@ -185,6 +185,9 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t);
 
 /* This macro is used to mark whether an asm implentation is found */
 #undef MULADD64_ASM
+/* This macro is used to mark whether the implementation has a small
+ * code size (ie, it can be inlined even in an unrolled loop) */
+#undef MULADD64_SMALL
 
 /*
  * Currently assembly optimisations are only supported with GCC/Clang for
@@ -218,6 +221,7 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
     return ((uint64_t) t << 32) | z;
 }
 #define MULADD64_ASM
+#define MULADD64_SMALL
 
 #else /* __ARM_FEATURE_DSP */
 
@@ -297,6 +301,7 @@ static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
 {
     return (uint64_t) x * y + z + t;
 }
+#define MULADD64_SMALL
 #else
 static uint64_t u32_muladd64(uint32_t x, uint32_t y, uint32_t z, uint32_t t)
 {
@@ -342,21 +347,27 @@ static uint32_t u288_muladd(uint32_t z[9], uint32_t x, const uint32_t y[8])
 {
     uint32_t carry = 0;
 
-    //for (unsigned i = 0; i < 8; i++) {
-#define STEP(i) \
+#define U288_MULADD_STEP(i) \
     do { \
         uint64_t prod = u32_muladd64(x, y[i], z[i], carry); \
         z[i] = (uint32_t) prod; \
         carry = (uint32_t) (prod >> 32); \
     } while( 0 )
-    STEP(0);
-    STEP(1);
-    STEP(2);
-    STEP(3);
-    STEP(4);
-    STEP(5);
-    STEP(6);
-    STEP(7);
+
+#if defined(MULADD64_SMALL)
+    U288_MULADD_STEP(0);
+    U288_MULADD_STEP(1);
+    U288_MULADD_STEP(2);
+    U288_MULADD_STEP(3);
+    U288_MULADD_STEP(4);
+    U288_MULADD_STEP(5);
+    U288_MULADD_STEP(6);
+    U288_MULADD_STEP(7);
+#else
+    for (unsigned i = 0; i < 8; i++) {
+        U288_MULADD_STEP(i);
+    }
+#endif
 
     uint64_t sum = (uint64_t) z[8] + carry;
     z[8] = (uint32_t) sum;
