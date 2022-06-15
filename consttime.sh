@@ -1,6 +1,9 @@
 #!/bin/sh
 
 # Check constant-time behaviour using MemSan and Valgrind.
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 set -eu
 

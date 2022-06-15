@@ -5,6 +5,9 @@
 # This is a development helper to:
 # 1. Check it the toolchain-provided __aeabi_lmul is contant-time (it isn't).
 # 2. Check if the compiler uses the UMAAL instruction (it doesn't).
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 set -eu
 

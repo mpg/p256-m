@@ -1,6 +1,9 @@
 #!/bin/sh
 
 # Print dependencies on libc / compiler's runtime, with sizes.
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 set -eu
 

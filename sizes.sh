@@ -1,6 +1,9 @@
 #!/bin/sh
 
 # Print the size of p256-m.o with GCC and Clang on selected cores.
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 set -eu
 

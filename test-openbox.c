@@ -3,6 +3,9 @@
  *
  * - unit-tests for static functions (by including the C file)
  * - tests using a fixed RNG (and knowledge of how it's used)
+ *
+ * Author: Manuel Pégourié-Gonnard.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "p256-m.c"

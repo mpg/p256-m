@@ -1,6 +1,9 @@
 /*
  * Dummy program for on-host profiling.
  * See prof-vg.sh, prof-g.sh, prof-gpt.sh
+ *
+ * Author: Manuel Pégourié-Gonnard.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include <stdlib.h>

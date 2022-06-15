@@ -4,6 +4,9 @@
  * - validate determinstic public functions against standard test vectors
  * - validate non-deterministic public functions against other functions
  * - exercise error cases that can be reached in a deterministic way
+ *
+ * Author: Manuel Pégourié-Gonnard.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "p256-m.h"

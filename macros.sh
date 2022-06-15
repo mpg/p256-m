@@ -2,6 +2,9 @@
 
 # Print the values of pre-defined macros of interest on a selection of cores.
 # This is a development helper to investigate how to detect cores/features.
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 set -eu
 

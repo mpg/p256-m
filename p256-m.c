@@ -1,9 +1,8 @@
 /*
  * Implementation of curve P-256 (ECDH and ECDSA)
- */
-/*
- * Copyright Manuel Pégourié-Gonnard.
- * All rights reserved.
+ *
+ * Author: Manuel Pégourié-Gonnard.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "p256-m.h"

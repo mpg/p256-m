@@ -2,6 +2,9 @@
 
 # Build and run the on-host benchmark program.
 # (See also: on-target-benchmark directory.)
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 set -eu
 

@@ -1,6 +1,9 @@
 #!/bin/sh
 
 # On-host profiling using Valgrind
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 set -eu
 

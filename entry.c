@@ -1,5 +1,8 @@
 /*
  * See deps.sh - this provides an entry point for the linker.
+ *
+ * Author: Manuel Pégourié-Gonnard.
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 #include "p256-m.h"

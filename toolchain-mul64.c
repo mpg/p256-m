@@ -1,5 +1,8 @@
 /*
  * See toolchain-mul64.sh.
+ *
+ * Author: Manuel Pégourié-Gonnard.
+ * SPDX-License-Identifier: Apache-2.0
  */
 #include <stdint.h>
 

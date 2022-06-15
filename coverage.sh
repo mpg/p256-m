@@ -1,6 +1,9 @@
 #!/bin/sh
 
 # Measure code coverage with open/closed-box testing using gcov/lcov.
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 set -eu
 

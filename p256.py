@@ -1,5 +1,8 @@
 #!/usr/bin/python3
 # coding: utf-8
+#
+# Author: Manuel Pégourié-Gonnard.
+# SPDX-License-Identifier: Apache-2.0
 
 """A simple implementation of P-256 (ECDH, ECDSA) for tests."""
 
